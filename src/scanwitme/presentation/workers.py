@@ -32,6 +32,7 @@ class OCRWorker(QRunnable):
         language: str,
         ocr_provider: OCRProvider,
         signals: WorkerSignals,
+        direction: str = "auto",
     ) -> None:
         super().__init__()
         self._session_id = session_id
@@ -39,6 +40,7 @@ class OCRWorker(QRunnable):
         self._language = language
         self._ocr_provider = ocr_provider
         self.signals = signals
+        self._direction = direction
 
     def run(self) -> None:
         start_time = time.perf_counter()
@@ -46,6 +48,7 @@ class OCRWorker(QRunnable):
             blocks = self._ocr_provider.recognize(
                 image_data=self._image_bytes,
                 language=self._language,
+                direction=self._direction,
             )
             duration_ms = (time.perf_counter() - start_time) * 1000.0
             self.signals.ocr_done.emit(self._session_id, blocks, duration_ms)

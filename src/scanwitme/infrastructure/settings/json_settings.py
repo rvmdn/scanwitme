@@ -58,6 +58,8 @@ class JsonSettingsRepository(SettingsRepository):
             default_target_language=self.get("default_target_language", "id"),
             default_translation_provider=self.get("default_translation_provider", "free_direct"),
             display_mode=self.get("display_mode", "both"),
+            text_direction=self.get("text_direction", "auto"),
+            ocr_engine=self.get("ocr_engine", "paddle"),
             hotkey=self.get("hotkey", "<ctrl>+<shift>+s"),
             cache_enabled=self.get("cache_enabled", True),
             cache_db_path=self.get("cache_db_path", ""),

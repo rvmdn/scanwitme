@@ -28,6 +28,8 @@ class AppSettings:
     default_target_language: str = "id"
     default_translation_provider: str = "free_direct"  # "free_direct", "web_launcher", or "cloud_v2"
     display_mode: str = "both"  # "bubble" (manga inpainting), "card" (floating popup), or "both"
+    text_direction: str = "auto"  # "auto" (smart detect), "vertical" (Japanese manga), or "horizontal"
+    ocr_engine: str = "paddle"  # "paddle" (built-in multi-lang & vertical) or "manga_ocr"
     hotkey: str = "<ctrl>+<shift>+s"
     cache_enabled: bool = True
     cache_db_path: str = ""
@@ -53,6 +55,14 @@ class AppSettings:
         valid_providers = {"free_direct", "web_launcher", "cloud_v2"}
         if self.default_translation_provider not in valid_providers:
             self.default_translation_provider = "free_direct"
+
+        valid_directions = {"auto", "vertical", "horizontal"}
+        if self.text_direction not in valid_directions:
+            self.text_direction = "auto"
+
+        valid_engines = {"paddle", "manga_ocr"}
+        if self.ocr_engine not in valid_engines:
+            self.ocr_engine = "paddle"
 
         valid_display_modes = {"bubble", "card", "both"}
         if self.display_mode not in valid_display_modes:

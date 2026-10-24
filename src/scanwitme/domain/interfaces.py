@@ -26,12 +26,18 @@ class OCRProvider(ABC):
     """Abstract interface for local optical character recognition."""
 
     @abstractmethod
-    def recognize(self, image_data: bytes, language: str = "ko") -> list[OCRBlock]:
+    def recognize(
+        self,
+        image_data: bytes,
+        language: str = "ko",
+        direction: str = "auto",
+    ) -> list[OCRBlock]:
         """Perform text detection and recognition on raw image bytes.
 
         Args:
             image_data: Encoded image bytes (PNG/JPEG) or raw bitmap.
-            language: Target source language code (e.g. 'ko', 'zh').
+            language: Target source language code (e.g. 'ko', 'zh', 'ja').
+            direction: Text reading direction ('auto', 'vertical', 'horizontal').
 
         Returns:
             A list of recognized OCRBlocks sorted in natural reading order.

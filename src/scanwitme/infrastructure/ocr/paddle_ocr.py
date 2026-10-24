@@ -64,10 +64,123 @@ def detect_script(text: str) -> str:
     return "en"
 
 
+def detect_text_layout_direction(blocks: list[OCRBlock]) -> str:
+    """Smart-detect whether dialogue blocks are arranged vertically (tategaki) or horizontally."""
+    if not blocks:
+        return "horizontal"
+
+    # 1. Check aspect ratio of detected blocks (tall boxes height >= 1.2 * width)
+    vertical_box_count = 0
+    for b in blocks:
+        h = b.max_y - b.min_y
+        w = b.max_x - b.min_x
+        if h >= 1.2 * w:
+            vertical_box_count += 1
+
+    if (vertical_box_count / len(blocks)) >= 0.35:
+        return "vertical"
+
+    # 2. Check vertical column grouping vs horizontal row grouping
+    vertical_pairs = 0
+    horizontal_pairs = 0
+    for i in range(len(blocks)):
+        b1 = blocks[i]
+        c1_x = (b1.min_x + b1.max_x) / 2
+        c1_y = (b1.min_y + b1.max_y) / 2
+        for j in range(i + 1, len(blocks)):
+            b2 = blocks[j]
+            c2_x = (b2.min_x + b2.max_x) / 2
+            c2_y = (b2.min_y + b2.max_y) / 2
+            dx = abs(c1_x - c2_x)
+            dy = abs(c1_y - c2_y)
+            if dx <= 25 and dy >= 15:
+                vertical_pairs += 1
+            elif dy <= 18 and dx >= 15:
+                horizontal_pairs += 1
+
+    if vertical_pairs > horizontal_pairs and vertical_pairs >= 2:
+        return "vertical"
+
+    return "horizontal"
+
+
+def sort_vertical_reading_order(blocks: list[OCRBlock]) -> list[OCRBlock]:
+    """Sort vertical manga dialogue: columns Right-to-Left, lines Top-to-Bottom."""
+    if not blocks:
+        return []
+
+    avg_width = sum(b.max_x - b.min_x for b in blocks) / len(blocks)
+    x_tolerance = max(12.0, avg_width * 0.6)
+
+    # Sort primarily from Right to Left (highest max_x first)
+    blocks_by_x = sorted(blocks, key=lambda b: (-b.max_x, b.min_y))
+
+    columns: list[list[OCRBlock]] = []
+    for block in blocks_by_x:
+        placed = False
+        block_cx = (block.min_x + block.max_x) / 2
+        for col in columns:
+            col_cx = sum((b.min_x + b.max_x) / 2 for b in col) / len(col)
+            if abs(block_cx - col_cx) <= x_tolerance:
+                col.append(block)
+                placed = True
+                break
+        if not placed:
+            columns.append([block])
+
+    # Ensure columns are sorted from Right to Left (highest avg X first)
+    columns.sort(key=lambda col: -sum((b.min_x + b.max_x) / 2 for b in col) / len(col))
+
+    ordered: list[OCRBlock] = []
+    order_index = 1
+    for col in columns:
+        col_sorted = sorted(col, key=lambda b: b.min_y)
+        for b in col_sorted:
+            b.reading_order = order_index
+            ordered.append(b)
+            order_index += 1
+
+    return ordered
+
+
+def sort_horizontal_reading_order(blocks: list[OCRBlock]) -> list[OCRBlock]:
+    """Sort standard horizontal dialogue: lines Top-to-Bottom, words Left-to-Right."""
+    if not blocks:
+        return []
+
+    avg_height = sum(b.max_y - b.min_y for b in blocks) / len(blocks)
+    y_tolerance = max(8.0, avg_height * 0.5)
+
+    blocks_by_y = sorted(blocks, key=lambda b: (b.min_y, b.min_x))
+
+    lines: list[list[OCRBlock]] = []
+    for block in blocks_by_y:
+        placed = False
+        for line in lines:
+            line_y = sum(b.min_y for b in line) / len(line)
+            if abs(block.min_y - line_y) <= y_tolerance:
+                line.append(block)
+                placed = True
+                break
+        if not placed:
+            lines.append([block])
+
+    ordered: list[OCRBlock] = []
+    order_index = 1
+    for line in lines:
+        line_sorted = sorted(line, key=lambda b: b.min_x)
+        for b in line_sorted:
+            b.reading_order = order_index
+            ordered.append(b)
+            order_index += 1
+
+    return ordered
+
+
 class PaddleOCRProvider(OCRProvider):
     """Local OCR engine wrapping PaddleOCR with multi-language caching and spatial sorting."""
 
-    def __init__(self, use_textline_orientation: bool = False) -> None:
+    def __init__(self, use_textline_orientation: bool = True) -> None:
         self._use_textline_orientation = use_textline_orientation
         self._engines: dict[str, Any] = {}
 
@@ -158,7 +271,12 @@ class PaddleOCRProvider(OCRProvider):
 
         return raw_blocks
 
-    def recognize(self, image_data: bytes, language: str = "auto") -> list[OCRBlock]:
+    def recognize(
+        self,
+        image_data: bytes,
+        language: str = "auto",
+        direction: str = "auto",
+    ) -> list[OCRBlock]:
         """Perform text detection and recognition on image bytes."""
         if not image_data:
             raise OCRNoTextFound("Image data is empty.")
@@ -176,7 +294,16 @@ class PaddleOCRProvider(OCRProvider):
 
         raw_blocks: list[OCRBlock] = []
 
-        if language == "auto":
+        # If explicitly Japanese:
+        if language in ("ja", "japan"):
+            try:
+                engine_ja = self._get_engine("japan")
+                res_ja = engine_ja.ocr(img_np)
+                raw_blocks = self._parse_results(res_ja)
+            except Exception as exc:
+                logger.warning("Japanese OCR pass failed: %s", exc)
+
+        elif language == "auto":
             # Auto-detect language:
             # First attempt with "ch" model (PP-OCRv6 handles Chinese, Japanese, and English)
             try:
@@ -191,8 +318,23 @@ class PaddleOCRProvider(OCRProvider):
             combined_text = "".join(b.text for b in blocks_zh)
             avg_score = sum(b.confidence for b in blocks_zh) / len(blocks_zh) if blocks_zh else 0.0
 
-            # If Chinese/Japanese characters detected with solid confidence, use it
-            if (
+            # If kana is present or vertical text layout detected with Asian characters,
+            # verify or refine with dedicated Japan engine
+            has_kana = any(
+                "\u3040" <= ch <= "\u309f" or "\u30a0" <= ch <= "\u30ff" for ch in combined_text
+            )
+            if has_kana or (direction == "vertical" and blocks_zh):
+                try:
+                    engine_ja = self._get_engine("japan")
+                    res_ja = engine_ja.ocr(img_np)
+                    blocks_ja = self._parse_results(res_ja)
+                    if blocks_ja:
+                        raw_blocks = blocks_ja
+                    else:
+                        raw_blocks = blocks_zh
+                except Exception:
+                    raw_blocks = blocks_zh
+            elif (
                 blocks_zh
                 and avg_score >= 0.55
                 and not any("\uac00" <= ch <= "\ud7af" for ch in combined_text)
@@ -227,44 +369,31 @@ class PaddleOCRProvider(OCRProvider):
         if not raw_blocks:
             raise OCRNoTextFound("No readable text recognized in image.")
 
-        # Sort blocks into deterministic reading order
-        sorted_blocks = self._sort_reading_order(raw_blocks)
+        # Sort blocks into deterministic reading order (supports vertical manga and horizontal)
+        sorted_blocks = self._sort_reading_order(raw_blocks, direction=direction)
         return sorted_blocks
 
-    @staticmethod
-    def _sort_reading_order(blocks: list[OCRBlock]) -> list[OCRBlock]:
-        """Sort detected dialogue blocks top-to-bottom, left-to-right with line grouping."""
+    @classmethod
+    def _sort_reading_order(
+        cls,
+        blocks: list[OCRBlock],
+        direction: str = "auto",
+    ) -> list[OCRBlock]:
+        """Sort detected dialogue blocks using smart layout or explicit direction."""
         if not blocks:
             return []
 
-        # Calculate average block height to determine line-grouping tolerance
-        avg_height = sum(b.max_y - b.min_y for b in blocks) / len(blocks)
-        y_tolerance = max(8.0, avg_height * 0.5)
-
-        # Sort primarily by min_y
-        blocks_by_y = sorted(blocks, key=lambda b: (b.min_y, b.min_x))
-
-        lines: list[list[OCRBlock]] = []
-        for block in blocks_by_y:
-            placed = False
-            for line in lines:
-                # Check if block vertically overlaps within tolerance with this line
-                line_y = sum(b.min_y for b in line) / len(line)
-                if abs(block.min_y - line_y) <= y_tolerance:
-                    line.append(block)
-                    placed = True
-                    break
-            if not placed:
-                lines.append([block])
-
-        # Sort each line left-to-right (or right-to-left if needed; manhwa is LTR)
-        ordered: list[OCRBlock] = []
-        order_index = 1
-        for line in lines:
-            line_sorted = sorted(line, key=lambda b: b.min_x)
-            for b in line_sorted:
-                b.reading_order = order_index
-                ordered.append(b)
-                order_index += 1
-
-        return ordered
+        if direction == "vertical":
+            logger.info("Applying Japanese vertical reading order (Right-to-Left, Top-to-Bottom).")
+            return sort_vertical_reading_order(blocks)
+        elif direction == "horizontal":
+            return sort_horizontal_reading_order(blocks)
+        else:  # "auto"
+            detected = detect_text_layout_direction(blocks)
+            if detected == "vertical":
+                logger.info(
+                    "Smart-detected vertical dialogue layout. Applying RTL/TTB reading order."
+                )
+                return sort_vertical_reading_order(blocks)
+            else:
+                return sort_horizontal_reading_order(blocks)

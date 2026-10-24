@@ -129,6 +129,7 @@ class MainWindow(QMainWindow):
     source_language_changed = Signal(str)
     provider_changed = Signal(str)
     display_mode_changed = Signal(str)
+    text_direction_changed = Signal(str)
 
     def __init__(self, settings_repo: SettingsRepository, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -137,7 +138,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ScanWitMe PC — Screen Translator")
         self.setWindowIcon(create_default_tray_icon())
         self.setStyleSheet(MAIN_STYLESHEET)
-        self.setFixedSize(500, 400)
+        self.setFixedSize(500, 440)
 
         self._build_ui()
         self._load_settings()
@@ -256,6 +257,21 @@ class MainWindow(QMainWindow):
         mode_row.addStretch()
         group_layout.addLayout(mode_row)
 
+        # Direction row (Auto Smart Detect vs Vertical Manga vs Horizontal)
+        dir_row = QHBoxLayout()
+        dir_label = QLabel("Arah Baca:", group)
+        dir_label.setStyleSheet("color: #94a3b8;")
+        self._dir_combo = QComboBox(group)
+        self._dir_combo.addItem("🔄 Otomatis (Smart Detect)", "auto")
+        self._dir_combo.addItem("⛩️ Vertikal Manga Jepang (縦書き)", "vertical")
+        self._dir_combo.addItem("➡️ Horizontal Standar (LTR)", "horizontal")
+        self._dir_combo.currentIndexChanged.connect(self._on_direction_changed)
+
+        dir_row.addWidget(dir_label)
+        dir_row.addWidget(self._dir_combo)
+        dir_row.addStretch()
+        group_layout.addLayout(dir_row)
+
         layout.addWidget(group)
 
         # Status and hotkey indicator footer
@@ -283,10 +299,15 @@ class MainWindow(QMainWindow):
         if idx_p >= 0:
             self._prov_combo.setCurrentIndex(idx_p)
 
-        display_mode = self._settings_repo.get("display_mode", "bubble")
+        display_mode = self._settings_repo.get("display_mode", "both")
         idx_m = self._mode_combo.findData(display_mode)
         if idx_m >= 0:
             self._mode_combo.setCurrentIndex(idx_m)
+
+        text_dir = self._settings_repo.get("text_direction", "auto")
+        idx_d = self._dir_combo.findData(text_dir)
+        if idx_d >= 0:
+            self._dir_combo.setCurrentIndex(idx_d)
 
         hotkey = self._settings_repo.get("hotkey", "<ctrl>+<shift>+s")
         # Format for display: replace <ctrl> with Ctrl, etc.
@@ -343,6 +364,12 @@ class MainWindow(QMainWindow):
         self._settings_repo.set("display_mode", mode)
         self._settings_repo.save()
         self.display_mode_changed.emit(mode)
+
+    def _on_direction_changed(self) -> None:
+        direction = self._dir_combo.currentData()
+        self._settings_repo.set("text_direction", direction)
+        self._settings_repo.save()
+        self.text_direction_changed.emit(direction)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Minimize to tray instead of quitting."""

@@ -83,6 +83,19 @@ class SettingsDialog(QDialog):
         self._mode_combo.addItem("🔀 Keduanya (Bubble + Kartu)", "both")
         form.addRow("Mode Tampilan:", self._mode_combo)
 
+        # Text Direction
+        self._dir_combo = QComboBox(self)
+        self._dir_combo.addItem("🔄 Otomatis (Smart Detect Vertikal/Horizontal)", "auto")
+        self._dir_combo.addItem("⛩️ Vertikal Manga Jepang (縦書き RTL)", "vertical")
+        self._dir_combo.addItem("➡️ Horizontal Standar (LTR)", "horizontal")
+        form.addRow("Arah Baca:", self._dir_combo)
+
+        # OCR Engine
+        self._engine_combo = QComboBox(self)
+        self._engine_combo.addItem("PaddleOCR (Bawaan — Multi-Bahasa & Vertikal)", "paddle")
+        self._engine_combo.addItem("Manga-OCR (Khusus Manga Jepang)", "manga_ocr")
+        form.addRow("Mesin OCR:", self._engine_combo)
+
         # Hotkey
         self._hotkey_edit = QLineEdit(self)
         self._hotkey_edit.setPlaceholderText("<ctrl>+<shift>+s")
@@ -135,10 +148,20 @@ class SettingsDialog(QDialog):
         if idx_p >= 0:
             self._provider_combo.setCurrentIndex(idx_p)
 
-        mode = self._settings_repo.get("display_mode", "bubble")
+        mode = self._settings_repo.get("display_mode", "both")
         idx_m = self._mode_combo.findData(mode)
         if idx_m >= 0:
             self._mode_combo.setCurrentIndex(idx_m)
+
+        direction = self._settings_repo.get("text_direction", "auto")
+        idx_d = self._dir_combo.findData(direction)
+        if idx_d >= 0:
+            self._dir_combo.setCurrentIndex(idx_d)
+
+        engine = self._settings_repo.get("ocr_engine", "paddle")
+        idx_e = self._engine_combo.findData(engine)
+        if idx_e >= 0:
+            self._engine_combo.setCurrentIndex(idx_e)
 
         hotkey = self._settings_repo.get("hotkey", "<ctrl>+<shift>+s")
         self._hotkey_edit.setText(hotkey)
@@ -155,12 +178,16 @@ class SettingsDialog(QDialog):
         src_lang = self._source_lang_combo.currentData()
         provider = self._provider_combo.currentData()
         mode = self._mode_combo.currentData()
+        direction = self._dir_combo.currentData()
+        engine = self._engine_combo.currentData()
         hotkey = self._hotkey_edit.text().strip() or "<ctrl>+<shift>+s"
 
         self._settings_repo.set("google_translate_api_key", api_key if api_key else None)
         self._settings_repo.set("default_source_language", src_lang)
         self._settings_repo.set("default_translation_provider", provider)
         self._settings_repo.set("display_mode", mode)
+        self._settings_repo.set("text_direction", direction)
+        self._settings_repo.set("ocr_engine", engine)
         self._settings_repo.set("hotkey", hotkey)
         self._settings_repo.save()
 

@@ -57,6 +57,13 @@ def test_main_window_elements_and_signals(qtbot: QtBot, tmp_path: Path) -> None:
     assert blocker.args == ["card"]
     assert repo.get("display_mode") == "card"
 
+    # Test text direction change
+    dir_idx = window._dir_combo.findData("vertical")
+    with qtbot.waitSignal(window.text_direction_changed, timeout=1000) as blocker:
+        window._dir_combo.setCurrentIndex(dir_idx)
+    assert blocker.args == ["vertical"]
+    assert repo.get("text_direction") == "vertical"
+
 
 @pytest.mark.ui
 def test_settings_dialog_save(qtbot: QtBot, tmp_path: Path) -> None:
@@ -70,6 +77,8 @@ def test_settings_dialog_save(qtbot: QtBot, tmp_path: Path) -> None:
     dialog._hotkey_edit.setText("<ctrl>+<alt>+x")
     m_idx = dialog._mode_combo.findData("both")
     dialog._mode_combo.setCurrentIndex(m_idx)
+    d_idx = dialog._dir_combo.findData("vertical")
+    dialog._dir_combo.setCurrentIndex(d_idx)
 
     with qtbot.waitSignal(dialog.settings_saved, timeout=1000):
         dialog._save_btn.click()
@@ -77,3 +86,4 @@ def test_settings_dialog_save(qtbot: QtBot, tmp_path: Path) -> None:
     assert repo.get("google_translate_api_key") == "AIzaSyTestKey123456789"
     assert repo.get("hotkey") == "<ctrl>+<alt>+x"
     assert repo.get("display_mode") == "both"
+    assert repo.get("text_direction") == "vertical"

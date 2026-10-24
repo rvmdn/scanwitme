@@ -15,6 +15,7 @@ from scanwitme.domain.errors import CaptureError
 from scanwitme.domain.models import OCRBlock, Rect, ScanState, TranslationResult
 from scanwitme.infrastructure.cache.sqlite_cache import SQLiteCacheRepository
 from scanwitme.infrastructure.capture.qt_capture import QtScreenCaptureProvider
+from scanwitme.infrastructure.ocr.manga_ocr import MangaOCRProvider
 from scanwitme.infrastructure.ocr.paddle_ocr import PaddleOCRProvider, detect_script
 from scanwitme.infrastructure.settings.json_settings import JsonSettingsRepository
 from scanwitme.infrastructure.translation.cloud_v2 import CloudTranslationV2Provider
@@ -58,6 +59,7 @@ class ScanWitMeApp(QObject):
 
         self.capture_provider = QtScreenCaptureProvider(self._q_app)
         self.ocr_provider = PaddleOCRProvider()
+        self.manga_ocr_provider = MangaOCRProvider()
 
         self.cloud_provider = CloudTranslationV2Provider(
             api_key=self.app_settings.google_translate_api_key
@@ -140,6 +142,7 @@ class ScanWitMeApp(QObject):
         self.main_window.toggle_frame_requested.connect(self._toggle_sniper_frame)
         self.main_window.settings_requested.connect(self._open_settings)
         self.main_window.display_mode_changed.connect(self._on_display_mode_changed)
+        self.main_window.text_direction_changed.connect(self._on_text_direction_changed)
         self.tray.scan_requested.connect(self.trigger_scan)
         self.tray.show_main_requested.connect(self._show_main_window)
         self.tray.settings_requested.connect(self._open_settings)
@@ -265,12 +268,20 @@ class ScanWitMeApp(QObject):
 
         # 3. Dispatch OCR worker to thread pool
         source_lang = self.settings_repo.get("default_source_language", "auto")
+        text_direction = self.settings_repo.get("text_direction", "auto")
+        ocr_engine_name = self.settings_repo.get("ocr_engine", "paddle")
+        active_ocr_provider = (
+            self.manga_ocr_provider
+            if ocr_engine_name == "manga_ocr" and self.manga_ocr_provider.is_available()
+            else self.ocr_provider
+        )
         ocr_worker = OCRWorker(
             session_id=session.session_id,
             image_bytes=capture_result.image_bytes,
             language=source_lang,
-            ocr_provider=self.ocr_provider,
+            ocr_provider=active_ocr_provider,
             signals=self.worker_signals,
+            direction=text_direction,
         )
         self.thread_pool.start(ocr_worker)
 
@@ -323,8 +334,10 @@ class ScanWitMeApp(QObject):
         else:
             self.workflow.set_provider(self.free_provider)
 
+        has_vert = any((b.max_y - b.min_y) > 1.2 * (b.max_x - b.min_x) for b in blocks)
+        vert_tag = " (⛩️ Vertikal)" if has_vert else ""
         self.overlay.set_loading(
-            f"Menerjemahkan teks ({source_lang.upper()}, OCR: {ocr_duration_ms:.0f}ms)..."
+            f"Menerjemahkan teks ({source_lang.upper()}{vert_tag}, OCR: {ocr_duration_ms:.0f}ms)..."
         )
 
         trans_worker = TranslationWorker(
@@ -459,6 +472,10 @@ class ScanWitMeApp(QObject):
         elif mode == "card":
             self.bubble_overlay.clear_bubbles()
         logger.info("Display mode changed to: %s", mode)
+
+    def _on_text_direction_changed(self, direction: str) -> None:
+        self.app_settings.text_direction = direction
+        logger.info("Text reading direction set to: %s", direction)
 
     def _on_worker_error(self, session_id: str, error_message: str) -> None:
         if not self.controller.on_error(session_id, error_message):
