@@ -128,6 +128,7 @@ class MainWindow(QMainWindow):
     settings_requested = Signal()
     source_language_changed = Signal(str)
     provider_changed = Signal(str)
+    display_mode_changed = Signal(str)
 
     def __init__(self, settings_repo: SettingsRepository, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -136,7 +137,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ScanWitMe PC — Screen Translator")
         self.setWindowIcon(create_default_tray_icon())
         self.setStyleSheet(MAIN_STYLESHEET)
-        self.setFixedSize(500, 360)
+        self.setFixedSize(500, 400)
 
         self._build_ui()
         self._load_settings()
@@ -240,6 +241,21 @@ class MainWindow(QMainWindow):
         provider_row.addStretch()
         group_layout.addLayout(provider_row)
 
+        # Mode row (Direct Bubble vs Pop-up Card vs Both)
+        mode_row = QHBoxLayout()
+        mode_label = QLabel("Tampilan:", group)
+        mode_label.setStyleSheet("color: #94a3b8;")
+        self._mode_combo = QComboBox(group)
+        self._mode_combo.addItem("💬 Balon Komik (Direct Bubble)", "bubble")
+        self._mode_combo.addItem("📋 Kartu Pop-up (Floating Card)", "card")
+        self._mode_combo.addItem("🔀 Keduanya (Bubble + Card)", "both")
+        self._mode_combo.currentIndexChanged.connect(self._on_display_mode_changed)
+
+        mode_row.addWidget(mode_label)
+        mode_row.addWidget(self._mode_combo)
+        mode_row.addStretch()
+        group_layout.addLayout(mode_row)
+
         layout.addWidget(group)
 
         # Status and hotkey indicator footer
@@ -266,6 +282,11 @@ class MainWindow(QMainWindow):
         idx_p = self._prov_combo.findData(provider)
         if idx_p >= 0:
             self._prov_combo.setCurrentIndex(idx_p)
+
+        display_mode = self._settings_repo.get("display_mode", "bubble")
+        idx_m = self._mode_combo.findData(display_mode)
+        if idx_m >= 0:
+            self._mode_combo.setCurrentIndex(idx_m)
 
         hotkey = self._settings_repo.get("hotkey", "<ctrl>+<shift>+s")
         # Format for display: replace <ctrl> with Ctrl, etc.
@@ -316,6 +337,12 @@ class MainWindow(QMainWindow):
         self._settings_repo.set("default_translation_provider", provider)
         self._settings_repo.save()
         self.provider_changed.emit(provider)
+
+    def _on_display_mode_changed(self) -> None:
+        mode = self._mode_combo.currentData()
+        self._settings_repo.set("display_mode", mode)
+        self._settings_repo.save()
+        self.display_mode_changed.emit(mode)
 
     def closeEvent(self, event: QCloseEvent) -> None:
         """Minimize to tray instead of quitting."""

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+import re
 
-from PySide6.QtCore import QObject, QPoint, QRunnable, QThreadPool
+from PySide6.QtCore import QObject, QPoint, QRect, QRunnable, QThreadPool
 from PySide6.QtWidgets import QApplication
 
 from scanwitme.application.cache_service import CacheService
@@ -22,6 +23,11 @@ from scanwitme.infrastructure.translation.web_launcher import (
     GoogleLensLauncher,
     GoogleSearchLauncher,
     GoogleTranslateWebLauncher,
+)
+from scanwitme.presentation.bubble_overlay import (
+    BubbleItem,
+    BubbleOverlayWindow,
+    cluster_ocr_blocks,
 )
 from scanwitme.presentation.floating_overlay import FloatingOverlay
 from scanwitme.presentation.hotkey import GlobalHotkeyManager
@@ -83,6 +89,7 @@ class ScanWitMeApp(QObject):
         self.region_selector = RegionSelector()
         self.sniper_frame = SniperFrame()
         self.overlay = FloatingOverlay()
+        self.bubble_overlay = BubbleOverlayWindow()
         self.tray = TrayManager(self.main_window)
         self.settings_dialog: SettingsDialog | None = None
 
@@ -132,6 +139,7 @@ class ScanWitMeApp(QObject):
         self.main_window.scan_requested.connect(self.trigger_scan)
         self.main_window.toggle_frame_requested.connect(self._toggle_sniper_frame)
         self.main_window.settings_requested.connect(self._open_settings)
+        self.main_window.display_mode_changed.connect(self._on_display_mode_changed)
         self.tray.scan_requested.connect(self.trigger_scan)
         self.tray.show_main_requested.connect(self._show_main_window)
         self.tray.settings_requested.connect(self._open_settings)
@@ -200,6 +208,7 @@ class ScanWitMeApp(QObject):
 
         # Hide any active ScanWitMe overlays before capture so they are not captured
         self.overlay.hide()
+        self.bubble_overlay.clear_bubbles()
         self.region_selector.start_selection()
         self.main_window.set_status("Pilih area manga di layar...")
 
@@ -216,6 +225,7 @@ class ScanWitMeApp(QObject):
             return
 
         self.overlay.hide()
+        self.bubble_overlay.clear_bubbles()
         # Temporarily hide sniper frame border during screenshot
         self.sniper_frame.hide()
         try:
@@ -231,6 +241,7 @@ class ScanWitMeApp(QObject):
         if not session:
             return
 
+        self.bubble_overlay.clear_bubbles()
         self.main_window.set_status("Menangkap layar dan memproses OCR...")
 
         # 1. Capture screen region
@@ -242,11 +253,15 @@ class ScanWitMeApp(QObject):
             self.main_window.set_status(f"Gagal menangkap layar: {exc}")
             return
 
-        # 2. Position overlay conveniently near the bottom or side of selection
-        overlay_x = rect.x
-        overlay_y = rect.bottom + 8
-        self.overlay.move(QPoint(overlay_x, overlay_y))
-        self.overlay.set_loading("Mengenali teks...")
+        # 2. Position overlay conveniently near the bottom or side of selection if enabled
+        display_mode = self.settings_repo.get("display_mode", "both")
+        if display_mode in ("card", "both"):
+            overlay_x = rect.x
+            overlay_y = rect.bottom + 8
+            self.overlay.move(QPoint(overlay_x, overlay_y))
+            self.overlay.set_loading("Mengenali teks...")
+        else:
+            self.overlay.hide()
 
         # 3. Dispatch OCR worker to thread pool
         source_lang = self.settings_repo.get("default_source_language", "auto")
@@ -333,10 +348,117 @@ class ScanWitMeApp(QObject):
         ):
             return
 
-        self.overlay.display_result(result)
+        display_mode = self.settings_repo.get("display_mode", "both")
+        session = self.controller.current_session
+        capture_rect = (
+            session.capture.bounds
+            if session and session.capture
+            else None
+        )
+
+        # 1. Floating card display
+        if display_mode in ("card", "both"):
+            self.overlay.display_result(result)
+        else:
+            self.overlay.hide()
+
+        # 2. Direct comic bubble inpainting overlay
+        if display_mode in ("bubble", "both") and capture_rect and session and session.ocr_blocks:
+            bubbles = self._create_bubble_items(session.ocr_blocks, result.translated_text)
+            if bubbles:
+                self.bubble_overlay.display_bubbles(capture_rect, bubbles)
+
         self.main_window.set_status("Terjemahan selesai.")
         if self.live_watcher.is_active:
             self.live_watcher.reset_baseline()
+
+    def _create_bubble_items(
+        self,
+        blocks: list[OCRBlock],
+        translated_text: str,
+    ) -> list[BubbleItem]:
+        """Map OCR block clusters to translated comic dialogue bubbles."""
+        if not blocks:
+            return []
+
+        clusters = cluster_ocr_blocks(blocks)
+        if not clusters:
+            return []
+
+        # Sort clusters top-to-bottom
+        clusters.sort(key=lambda c: min(b.min_y for b in c))
+
+        pad_x = 8
+        pad_y = 6
+
+        if len(clusters) == 1:
+            c = clusters[0]
+            min_x = min(b.min_x for b in c)
+            min_y = min(b.min_y for b in c)
+            max_x = max(b.max_x for b in c)
+            max_y = max(b.max_y for b in c)
+            rect = QRect(
+                max(0, min_x - pad_x),
+                max(0, min_y - pad_y),
+                (max_x - min_x) + (pad_x * 2),
+                (max_y - min_y) + (pad_y * 2),
+            )
+            orig = " ".join(b.text.strip() for b in c)
+            return [BubbleItem(rect=rect, original_text=orig, translated_text=translated_text)]
+
+        # Multiple speech bubbles detected
+        lines = [line.strip() for line in translated_text.splitlines() if line.strip()]
+        if len(lines) == len(clusters):
+            bubble_texts = lines
+        else:
+            sentences = [
+                s.strip() for s in re.split(r"(?<=[.!?])\s+", translated_text) if s.strip()
+            ]
+            if len(sentences) == len(clusters):
+                bubble_texts = sentences
+            else:
+                words = translated_text.split()
+                total_orig_len = sum(len(" ".join(b.text for b in c)) for c in clusters) or 1
+                bubble_texts = []
+                curr_w = 0
+                for i, c in enumerate(clusters):
+                    if i == len(clusters) - 1:
+                        bubble_texts.append(" ".join(words[curr_w:]))
+                    else:
+                        c_len = len(" ".join(b.text for b in c))
+                        take_count = max(1, round(len(words) * (c_len / total_orig_len)))
+                        take_count = min(
+                            take_count,
+                            max(1, len(words) - curr_w - (len(clusters) - 1 - i)),
+                        )
+                        bubble_texts.append(" ".join(words[curr_w : curr_w + take_count]))
+                        curr_w += take_count
+
+        bubbles: list[BubbleItem] = []
+        for i, c in enumerate(clusters):
+            min_x = min(b.min_x for b in c)
+            min_y = min(b.min_y for b in c)
+            max_x = max(b.max_x for b in c)
+            max_y = max(b.max_y for b in c)
+            rect = QRect(
+                max(0, min_x - pad_x),
+                max(0, min_y - pad_y),
+                (max_x - min_x) + (pad_x * 2),
+                (max_y - min_y) + (pad_y * 2),
+            )
+            orig = " ".join(b.text.strip() for b in c)
+            trans = bubble_texts[i] if i < len(bubble_texts) else orig
+            bubbles.append(BubbleItem(rect=rect, original_text=orig, translated_text=trans))
+
+        return bubbles
+
+    def _on_display_mode_changed(self, mode: str) -> None:
+        self.app_settings.display_mode = mode
+        if mode == "bubble":
+            self.overlay.hide()
+        elif mode == "card":
+            self.bubble_overlay.clear_bubbles()
+        logger.info("Display mode changed to: %s", mode)
 
     def _on_worker_error(self, session_id: str, error_message: str) -> None:
         if not self.controller.on_error(session_id, error_message):
@@ -394,5 +516,6 @@ class ScanWitMeApp(QObject):
     def _exit_app(self) -> None:
         self.live_watcher.stop()
         self.hotkey_manager.stop()
+        self.bubble_overlay.clear_bubbles()
         self.tray.hide()
         self._q_app.quit()

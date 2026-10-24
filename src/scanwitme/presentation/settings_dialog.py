@@ -76,6 +76,13 @@ class SettingsDialog(QDialog):
         self._provider_combo.addItem("Google Cloud Translation API (v2)", "cloud_v2")
         form.addRow("Provider:", self._provider_combo)
 
+        # Display Mode
+        self._mode_combo = QComboBox(self)
+        self._mode_combo.addItem("💬 Balon Komik (Direct Bubble Overlay)", "bubble")
+        self._mode_combo.addItem("📋 Kartu Pop-up (Floating Overlay)", "card")
+        self._mode_combo.addItem("🔀 Keduanya (Bubble + Kartu)", "both")
+        form.addRow("Mode Tampilan:", self._mode_combo)
+
         # Hotkey
         self._hotkey_edit = QLineEdit(self)
         self._hotkey_edit.setPlaceholderText("<ctrl>+<shift>+s")
@@ -128,6 +135,11 @@ class SettingsDialog(QDialog):
         if idx_p >= 0:
             self._provider_combo.setCurrentIndex(idx_p)
 
+        mode = self._settings_repo.get("display_mode", "bubble")
+        idx_m = self._mode_combo.findData(mode)
+        if idx_m >= 0:
+            self._mode_combo.setCurrentIndex(idx_m)
+
         hotkey = self._settings_repo.get("hotkey", "<ctrl>+<shift>+s")
         self._hotkey_edit.setText(hotkey)
 
@@ -142,11 +154,13 @@ class SettingsDialog(QDialog):
         api_key = self._api_key_edit.text().strip()
         src_lang = self._source_lang_combo.currentData()
         provider = self._provider_combo.currentData()
+        mode = self._mode_combo.currentData()
         hotkey = self._hotkey_edit.text().strip() or "<ctrl>+<shift>+s"
 
         self._settings_repo.set("google_translate_api_key", api_key if api_key else None)
         self._settings_repo.set("default_source_language", src_lang)
         self._settings_repo.set("default_translation_provider", provider)
+        self._settings_repo.set("display_mode", mode)
         self._settings_repo.set("hotkey", hotkey)
         self._settings_repo.save()
 

@@ -50,6 +50,13 @@ def test_main_window_elements_and_signals(qtbot: QtBot, tmp_path: Path) -> None:
     assert blocker.args == ["cloud_v2"]
     assert repo.get("default_translation_provider") == "cloud_v2"
 
+    # Test display mode change
+    mode_idx = window._mode_combo.findData("card")
+    with qtbot.waitSignal(window.display_mode_changed, timeout=1000) as blocker:
+        window._mode_combo.setCurrentIndex(mode_idx)
+    assert blocker.args == ["card"]
+    assert repo.get("display_mode") == "card"
+
 
 @pytest.mark.ui
 def test_settings_dialog_save(qtbot: QtBot, tmp_path: Path) -> None:
@@ -61,9 +68,12 @@ def test_settings_dialog_save(qtbot: QtBot, tmp_path: Path) -> None:
 
     dialog._api_key_edit.setText("AIzaSyTestKey123456789")
     dialog._hotkey_edit.setText("<ctrl>+<alt>+x")
+    m_idx = dialog._mode_combo.findData("both")
+    dialog._mode_combo.setCurrentIndex(m_idx)
 
     with qtbot.waitSignal(dialog.settings_saved, timeout=1000):
         dialog._save_btn.click()
 
     assert repo.get("google_translate_api_key") == "AIzaSyTestKey123456789"
     assert repo.get("hotkey") == "<ctrl>+<alt>+x"
+    assert repo.get("display_mode") == "both"
