@@ -34,6 +34,7 @@ class SniperFrame(QWidget):
     """Framed sniper overlay that stays on screen ready to scan its framed area at any time."""
 
     scan_requested = Signal(object)  # Emits Rect
+    auto_scan_toggled = Signal(bool)
     closed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -53,6 +54,7 @@ class SniperFrame(QWidget):
         self._resize_corner: str | None = None
         self._resize_start_geometry: QRect | None = None
         self._resize_start_mouse: QPoint | None = None
+        self._auto_scan_active = False
 
         self._build_ui()
 
@@ -94,6 +96,14 @@ class SniperFrame(QWidget):
         bar_layout.addWidget(self._dim_label)
 
         bar_layout.addStretch()
+
+        # Auto-Scan (Live) Toggle Button
+        self._auto_btn = QPushButton("🔄 Auto: OFF", self._top_bar)
+        self._auto_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._auto_btn.setToolTip("Mode Live: Otomatis mendeteksi saat komik di-scroll dan menerjemahkan.")
+        self._update_auto_btn_style()
+        self._auto_btn.clicked.connect(self._toggle_auto_scan_clicked)
+        bar_layout.addWidget(self._auto_btn)
 
         # Instant Scan Button
         self._scan_btn = QPushButton("⚡ Scan (Enter)", self._top_bar)
@@ -160,6 +170,53 @@ class SniperFrame(QWidget):
         gh = max(10, self.height() - TOP_BAR_HEIGHT - (2 * BORDER_WIDTH))
         return Rect(x=int(gx), y=int(gy), width=int(gw), height=int(gh))
 
+    def _update_auto_btn_style(self) -> None:
+        if self._auto_scan_active:
+            self._auto_btn.setText("🟢 Auto: ON")
+            self._auto_btn.setStyleSheet("""
+                QPushButton {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+                    color: #ffffff;
+                    font-size: 11px;
+                    font-weight: bold;
+                    border-radius: 4px;
+                    padding: 3px 8px;
+                    border: 1px solid #34d399;
+                }
+                QPushButton:hover {
+                    background: #047857;
+                }
+            """)
+            self._title_label.setText("🎯 Bingkai [LIVE]")
+        else:
+            self._auto_btn.setText("🔄 Auto: OFF")
+            self._auto_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #1e293b;
+                    color: #94a3b8;
+                    font-size: 11px;
+                    font-weight: 600;
+                    border-radius: 4px;
+                    padding: 3px 8px;
+                    border: 1px solid #334155;
+                }
+                QPushButton:hover {
+                    background-color: #334155;
+                    color: #f8fafc;
+                }
+            """)
+            self._title_label.setText("🎯 Bingkai Pemindai")
+
+    def set_auto_scan_active(self, active: bool) -> None:
+        """Update auto-scan toggle state."""
+        self._auto_scan_active = active
+        self._update_auto_btn_style()
+
+    def _toggle_auto_scan_clicked(self) -> None:
+        self._auto_scan_active = not self._auto_scan_active
+        self._update_auto_btn_style()
+        self.auto_scan_toggled.emit(self._auto_scan_active)
+
     def trigger_capture(self) -> None:
         """Trigger scan signal for current frame rectangle."""
         rect = self.get_capture_rect()
@@ -168,6 +225,9 @@ class SniperFrame(QWidget):
 
     def close_frame(self) -> None:
         """Hide frame and emit closed signal."""
+        if self._auto_scan_active:
+            self.set_auto_scan_active(False)
+            self.auto_scan_toggled.emit(False)
         self.hide()
         self.closed.emit()
 

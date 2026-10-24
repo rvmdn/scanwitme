@@ -124,6 +124,7 @@ class MainWindow(QMainWindow):
 
     scan_requested = Signal()
     toggle_frame_requested = Signal()
+    auto_scan_toggled = Signal(bool)
     settings_requested = Signal()
     source_language_changed = Signal(str)
     provider_changed = Signal(str)
@@ -131,6 +132,7 @@ class MainWindow(QMainWindow):
     def __init__(self, settings_repo: SettingsRepository, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._settings_repo = settings_repo
+        self._auto_active = False
         self.setWindowTitle("ScanWitMe PC — Screen Translator")
         self.setWindowIcon(create_default_tray_icon())
         self.setStyleSheet(MAIN_STYLESHEET)
@@ -164,9 +166,9 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(header_layout)
 
-        # Scan Buttons Row (Big Scan + Sniper Frame Mode)
+        # Scan Buttons Row (Big Scan + Sniper Frame Mode + Live Auto)
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
+        btn_row.setSpacing(8)
 
         self._scan_btn = QPushButton("⚡ Scan Layar (Ctrl+Shift+S)", central)
         self._scan_btn.setObjectName("scanButton")
@@ -174,7 +176,7 @@ class MainWindow(QMainWindow):
         self._scan_btn.clicked.connect(self.scan_requested.emit)
         btn_row.addWidget(self._scan_btn, stretch=3)
 
-        self._frame_btn = QPushButton("🎯 Bingkai (Sniper)", central)
+        self._frame_btn = QPushButton("🎯 Bingkai", central)
         self._frame_btn.setObjectName("secondaryButton")
         self._frame_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._frame_btn.setToolTip(
@@ -182,6 +184,13 @@ class MainWindow(QMainWindow):
         )
         self._frame_btn.clicked.connect(self.toggle_frame_requested.emit)
         btn_row.addWidget(self._frame_btn, stretch=1)
+
+        self._auto_btn = QPushButton("🔄 Live Auto", central)
+        self._auto_btn.setObjectName("secondaryButton")
+        self._auto_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._auto_btn.setToolTip("Mode Live: Otomatis memindai saat panel komik di-scroll.")
+        self._auto_btn.clicked.connect(self._on_auto_clicked)
+        btn_row.addWidget(self._auto_btn, stretch=1)
 
         layout.addLayout(btn_row)
 
@@ -271,6 +280,26 @@ class MainWindow(QMainWindow):
     def update_from_settings(self) -> None:
         """Refresh UI state when settings change."""
         self._load_settings()
+
+    def set_auto_scan_active(self, active: bool) -> None:
+        """Update Live Auto-Scan button text and visual state."""
+        self._auto_active = active
+        if active:
+            self._auto_btn.setStyleSheet("""
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+                color: #ffffff;
+                font-weight: bold;
+                border: 1px solid #34d399;
+            """)
+            self._auto_btn.setText("🟢 Live: ON")
+        else:
+            self._auto_btn.setStyleSheet("")
+            self._auto_btn.setText("🔄 Live Auto")
+
+    def _on_auto_clicked(self) -> None:
+        new_state = not getattr(self, "_auto_active", False)
+        self.set_auto_scan_active(new_state)
+        self.auto_scan_toggled.emit(new_state)
 
     def set_status(self, message: str) -> None:
         """Update footer status bar text."""

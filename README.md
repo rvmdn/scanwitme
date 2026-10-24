@@ -4,6 +4,7 @@
 
 ## Features (v1.0)
 
+- **Mode Live Auto-Scan**: Otomatis mendeteksi saat halaman komik di-scroll dan langsung menerjemahkan panel baru tanpa perlu menekan tombol berulang kali.
 - **In-App Direct Free Translation**: Translates recognized dialogue directly inside the floating tool into Indonesian with zero setup and no API key required.
 - **Sniper Frame Mode**: Floating viewfinder frame that stays over your comic/manga, ready to scan repeatedly with one click or `Enter`.
 - **Auto Language Detection**: Automatically recognizes Mandarin (Hanzi), Korean (Hangul), Japanese (Kana), and English scripts.

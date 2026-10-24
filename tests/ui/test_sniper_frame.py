@@ -27,6 +27,12 @@ def test_sniper_frame_lifecycle_and_signals(qtbot: QtBot) -> None:
     with qtbot.waitSignal(frame.scan_requested, timeout=1000):
         qtbot.keyPress(frame, Qt.Key.Key_Return)
 
+    # Test auto-scan button click
+    with qtbot.waitSignal(frame.auto_scan_toggled, timeout=1000) as blocker:
+        frame._auto_btn.click()
+    assert blocker.args == [True]
+    assert "ON" in frame._auto_btn.text()
+
     # Test Close button click
     with qtbot.waitSignal(frame.closed, timeout=1000):
         frame._close_btn.click()

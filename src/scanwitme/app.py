@@ -11,7 +11,7 @@ from scanwitme.application.cache_service import CacheService
 from scanwitme.application.controller import ScanController
 from scanwitme.application.workflow import TranslationWorkflow
 from scanwitme.domain.errors import CaptureError
-from scanwitme.domain.models import OCRBlock, Rect, TranslationResult
+from scanwitme.domain.models import OCRBlock, Rect, ScanState, TranslationResult
 from scanwitme.infrastructure.cache.sqlite_cache import SQLiteCacheRepository
 from scanwitme.infrastructure.capture.qt_capture import QtScreenCaptureProvider
 from scanwitme.infrastructure.ocr.paddle_ocr import PaddleOCRProvider, detect_script
@@ -25,6 +25,7 @@ from scanwitme.infrastructure.translation.web_launcher import (
 )
 from scanwitme.presentation.floating_overlay import FloatingOverlay
 from scanwitme.presentation.hotkey import GlobalHotkeyManager
+from scanwitme.presentation.live_watcher import LiveAutoScanWatcher
 from scanwitme.presentation.main_window import MainWindow
 from scanwitme.presentation.region_selector import RegionSelector
 from scanwitme.presentation.settings_dialog import SettingsDialog
@@ -85,6 +86,18 @@ class ScanWitMeApp(QObject):
         self.tray = TrayManager(self.main_window)
         self.settings_dialog: SettingsDialog | None = None
 
+        # Live Auto-Scan Watcher
+        self.live_watcher = LiveAutoScanWatcher()
+        self.live_watcher.set_callbacks(
+            get_rect_fn=self.sniper_frame.get_capture_rect,
+            is_busy_fn=lambda: self.controller.state not in (
+                ScanState.IDLE,
+                ScanState.COMPLETED,
+                ScanState.ERROR,
+                ScanState.CANCELLED,
+            ),
+        )
+
         # Global Hotkey Manager
         self.hotkey_manager = GlobalHotkeyManager(hotkey_str=self.app_settings.hotkey)
 
@@ -129,8 +142,12 @@ class ScanWitMeApp(QObject):
         self.region_selector.region_selected.connect(self._on_region_selected)
         self.region_selector.cancelled.connect(self._on_region_cancelled)
 
-        # Sniper frame
+        # Sniper frame & Live Auto-Scan
         self.sniper_frame.scan_requested.connect(self._on_sniper_scan_requested)
+        self.sniper_frame.auto_scan_toggled.connect(self._toggle_auto_scan)
+        self.main_window.auto_scan_toggled.connect(self._toggle_auto_scan)
+        self.live_watcher.scan_triggered.connect(self._on_sniper_scan_requested)
+        self.live_watcher.status_updated.connect(self.main_window.set_status)
 
         # Overlay actions
         self.overlay.search_requested.connect(self._on_search_requested)
@@ -142,13 +159,32 @@ class ScanWitMeApp(QObject):
     def _toggle_sniper_frame(self) -> None:
         """Toggle on-screen sniper frame visibility."""
         if self.sniper_frame.isVisible():
+            if self.live_watcher.is_active:
+                self._toggle_auto_scan(False)
             self.sniper_frame.hide()
             self.main_window.set_status("Bingkai pemindai disembunyikan.")
         else:
             self.sniper_frame.show()
             self.main_window.set_status(
-                "Bingkai pemindai aktif. Posisikan di atas manga & tekan Scan."
+                "Bingkai pemindai aktif. Posisikan di atas manga & tekan Scan (atau aktifkan Live Auto)."
             )
+
+    def _toggle_auto_scan(self, enabled: bool) -> None:
+        """Toggle real-time auto-scan on comic panel scroll/movement."""
+        if enabled:
+            if not self.sniper_frame.isVisible():
+                self.sniper_frame.show()
+            self.live_watcher.start()
+            self.sniper_frame.set_auto_scan_active(True)
+            self.main_window.set_auto_scan_active(True)
+            self.main_window.set_status(
+                "🟢 Live Auto-Scan Aktif — Komik akan dipindai otomatis saat di-scroll."
+            )
+        else:
+            self.live_watcher.stop()
+            self.sniper_frame.set_auto_scan_active(False)
+            self.main_window.set_auto_scan_active(False)
+            self.main_window.set_status("Mode Live Auto-Scan dinonaktifkan.")
 
     def trigger_scan(self) -> None:
         """Start region scan workflow. If sniper frame is active, scans it directly."""
@@ -299,6 +335,8 @@ class ScanWitMeApp(QObject):
 
         self.overlay.display_result(result)
         self.main_window.set_status("Terjemahan selesai.")
+        if self.live_watcher.is_active:
+            self.live_watcher.reset_baseline()
 
     def _on_worker_error(self, session_id: str, error_message: str) -> None:
         if not self.controller.on_error(session_id, error_message):
@@ -354,6 +392,7 @@ class ScanWitMeApp(QObject):
         self.main_window.activateWindow()
 
     def _exit_app(self) -> None:
+        self.live_watcher.stop()
         self.hotkey_manager.stop()
         self.tray.hide()
         self._q_app.quit()

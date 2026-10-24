@@ -30,6 +30,12 @@ def test_main_window_elements_and_signals(qtbot: QtBot, tmp_path: Path) -> None:
     with qtbot.waitSignal(window.toggle_frame_requested, timeout=1000):
         window._frame_btn.click()
 
+    # Test auto scan toggle button signal
+    with qtbot.waitSignal(window.auto_scan_toggled, timeout=1000) as blocker:
+        window._auto_btn.click()
+    assert blocker.args == [True]
+    assert "ON" in window._auto_btn.text()
+
     # Test source language change
     zh_idx = window._src_combo.findData("zh-CN")
     with qtbot.waitSignal(window.source_language_changed, timeout=1000) as blocker:
