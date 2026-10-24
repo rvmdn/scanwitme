@@ -233,7 +233,7 @@ class SniperFrame(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
-            pos = event.pos()
+            pos = event.position().toPoint()
             # Check if bottom-right resize corner
             if (
                 pos.x() >= self.width() - RESIZE_MARGIN * 2
@@ -256,7 +256,7 @@ class SniperFrame(QWidget):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        pos = event.pos()
+        pos = event.position().toPoint()
 
         # Update cursor when hovering over bottom-right resize area
         if not self._resize_drag and not self._drag_position:

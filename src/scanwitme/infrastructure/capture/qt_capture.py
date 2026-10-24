@@ -48,8 +48,10 @@ class QtScreenCaptureProvider(CaptureProvider):
         # Clamp relative coordinates within screen boundaries
         crop_x = max(0, rel_x)
         crop_y = max(0, rel_y)
-        crop_w = min(rect.width, screen_geo.width() - crop_x)
-        crop_h = min(rect.height, screen_geo.height() - crop_y)
+        crop_right = min(screen_geo.width(), rel_x + rect.width)
+        crop_bottom = min(screen_geo.height(), rel_y + rect.height)
+        crop_w = max(0, crop_right - crop_x)
+        crop_h = max(0, crop_bottom - crop_y)
 
         if crop_w <= 0 or crop_h <= 0:
             raise CaptureError(
@@ -73,10 +75,12 @@ class QtScreenCaptureProvider(CaptureProvider):
             raise CaptureError("Failed to encode captured pixmap to PNG bytes.")
 
         png_bytes = bytes(buffer.data())
+        actual_x = screen_geo.x() + crop_x
+        actual_y = screen_geo.y() + crop_y
         logger.debug(
             "Captured region (%d, %d, %d, %d) on screen %s with DPR %.2f, byte size %d",
-            rect.x,
-            rect.y,
+            actual_x,
+            actual_y,
             crop_w,
             crop_h,
             screen.name(),
@@ -86,7 +90,7 @@ class QtScreenCaptureProvider(CaptureProvider):
 
         return CaptureResult(
             image_bytes=png_bytes,
-            bounds=Rect(x=rect.x, y=rect.y, width=crop_w, height=crop_h),
+            bounds=Rect(x=actual_x, y=actual_y, width=crop_w, height=crop_h),
             device_pixel_ratio=dpr,
             extra={
                 "screen_name": screen.name(),

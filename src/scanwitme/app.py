@@ -143,6 +143,8 @@ class ScanWitMeApp(QObject):
         self.main_window.settings_requested.connect(self._open_settings)
         self.main_window.display_mode_changed.connect(self._on_display_mode_changed)
         self.main_window.text_direction_changed.connect(self._on_text_direction_changed)
+        self.main_window.source_language_changed.connect(self._on_source_lang_changed)
+        self.main_window.provider_changed.connect(self._on_provider_changed)
         self.tray.scan_requested.connect(self.trigger_scan)
         self.tray.show_main_requested.connect(self._show_main_window)
         self.tray.settings_requested.connect(self._open_settings)
@@ -377,9 +379,15 @@ class ScanWitMeApp(QObject):
 
         # 2. Direct comic bubble inpainting overlay
         if display_mode in ("bubble", "both") and capture_rect and session and session.ocr_blocks:
-            bubbles = self._create_bubble_items(session.ocr_blocks, result.translated_text)
+            bubbles = self._create_bubble_items(
+                session.ocr_blocks, result.translated_text, capture_rect
+            )
             if bubbles:
                 self.bubble_overlay.display_bubbles(capture_rect, bubbles)
+            else:
+                self.bubble_overlay.clear_bubbles()
+        else:
+            self.bubble_overlay.clear_bubbles()
 
         self.main_window.set_status("Terjemahan selesai.")
         if self.live_watcher.is_active:
@@ -389,6 +397,7 @@ class ScanWitMeApp(QObject):
         self,
         blocks: list[OCRBlock],
         translated_text: str,
+        capture_rect: Rect | None = None,
     ) -> list[BubbleItem]:
         """Map OCR block clusters to translated comic dialogue bubbles."""
         if not blocks:
@@ -398,11 +407,32 @@ class ScanWitMeApp(QObject):
         if not clusters:
             return []
 
-        # Sort clusters top-to-bottom
-        clusters.sort(key=lambda c: min(b.min_y for b in c))
+        # Determine reading direction (Japanese manga dialogue reads Right-to-Left)
+        text_dir = self.settings_repo.get("text_direction", "auto")
+        is_vert = (
+            text_dir == "vertical"
+            or (text_dir == "auto" and any((b.max_y - b.min_y) > 1.2 * (b.max_x - b.min_x) for b in blocks))
+        )
+
+        if is_vert:
+            # Japanese manga: columns Right-to-Left, lines Top-to-Bottom
+            clusters.sort(key=lambda c: (-max(b.max_x for b in c), min(b.min_y for b in c)))
+        else:
+            # Standard horizontal comics: Top-to-Bottom, Left-to-Right
+            clusters.sort(key=lambda c: (min(b.min_y for b in c), min(b.min_x for b in c)))
 
         pad_x = 8
         pad_y = 6
+
+        def _make_clamped_rect(min_x: int, min_y: int, max_x: int, max_y: int) -> QRect:
+            rx = max(0, min_x - pad_x)
+            ry = max(0, min_y - pad_y)
+            rw = (max_x - min_x) + (pad_x * 2)
+            rh = (max_y - min_y) + (pad_y * 2)
+            if capture_rect:
+                rw = max(1, min(capture_rect.width - rx, rw))
+                rh = max(1, min(capture_rect.height - ry, rh))
+            return QRect(rx, ry, rw, rh)
 
         if len(clusters) == 1:
             c = clusters[0]
@@ -410,12 +440,7 @@ class ScanWitMeApp(QObject):
             min_y = min(b.min_y for b in c)
             max_x = max(b.max_x for b in c)
             max_y = max(b.max_y for b in c)
-            rect = QRect(
-                max(0, min_x - pad_x),
-                max(0, min_y - pad_y),
-                (max_x - min_x) + (pad_x * 2),
-                (max_y - min_y) + (pad_y * 2),
-            )
+            rect = _make_clamped_rect(min_x, min_y, max_x, max_y)
             orig = " ".join(b.text.strip() for b in c)
             return [BubbleItem(rect=rect, original_text=orig, translated_text=translated_text)]
 
@@ -453,12 +478,7 @@ class ScanWitMeApp(QObject):
             min_y = min(b.min_y for b in c)
             max_x = max(b.max_x for b in c)
             max_y = max(b.max_y for b in c)
-            rect = QRect(
-                max(0, min_x - pad_x),
-                max(0, min_y - pad_y),
-                (max_x - min_x) + (pad_x * 2),
-                (max_y - min_y) + (pad_y * 2),
-            )
+            rect = _make_clamped_rect(min_x, min_y, max_x, max_y)
             orig = " ".join(b.text.strip() for b in c)
             trans = bubble_texts[i] if i < len(bubble_texts) else orig
             bubbles.append(BubbleItem(rect=rect, original_text=orig, translated_text=trans))
@@ -477,12 +497,24 @@ class ScanWitMeApp(QObject):
         self.app_settings.text_direction = direction
         logger.info("Text reading direction set to: %s", direction)
 
+    def _on_source_lang_changed(self, lang: str) -> None:
+        self.app_settings.default_source_language = lang
+        logger.info("Source language set to: %s", lang)
+
+    def _on_provider_changed(self, provider: str) -> None:
+        self.app_settings.default_translation_provider = provider
+        logger.info("Translation provider set to: %s", provider)
+
     def _on_worker_error(self, session_id: str, error_message: str) -> None:
         if not self.controller.on_error(session_id, error_message):
             return
 
-        self.overlay.set_error(error_message)
+        display_mode = self.settings_repo.get("display_mode", "both")
+        if display_mode in ("card", "both") and not self.live_watcher.is_active:
+            self.overlay.set_error(error_message)
         self.main_window.set_status(f"Error: {error_message}")
+        if self.live_watcher.is_active:
+            self.live_watcher.reset_baseline()
 
     def _on_search_requested(self, query: str) -> None:
         GoogleSearchLauncher.launch(query)
@@ -524,6 +556,12 @@ class ScanWitMeApp(QObject):
 
         # Update hotkey
         self.hotkey_manager.update_hotkey(self.app_settings.hotkey)
+
+        # Refresh overlay state according to display mode
+        if self.app_settings.display_mode == "bubble":
+            self.overlay.hide()
+        elif self.app_settings.display_mode == "card":
+            self.bubble_overlay.clear_bubbles()
         self.main_window.set_status("Pengaturan diperbarui.")
 
     def _show_main_window(self) -> None:
