@@ -37,6 +37,17 @@ def test_cluster_ocr_blocks_distant() -> None:
     assert len(clusters) == 2
 
 
+def test_cluster_ocr_blocks_transitive_bridging() -> None:
+    # b1 and b3 are not directly adjacent, but b2 bridges them
+    b1 = OCRBlock(text="Line 1", box=[[10, 10], [60, 10], [60, 25], [10, 25]], confidence=0.99)
+    b3 = OCRBlock(text="Line 3", box=[[10, 50], [60, 50], [60, 65], [10, 65]], confidence=0.99)
+    b2 = OCRBlock(text="Line 2", box=[[10, 30], [60, 30], [60, 45], [10, 45]], confidence=0.99)
+
+    clusters = cluster_ocr_blocks([b1, b3, b2], max_v_gap=15, max_h_gap=20)
+    assert len(clusters) == 1
+    assert len(clusters[0]) == 3
+
+
 def test_bubble_overlay_display_and_clear(qtbot: QtBot) -> None:
     overlay = BubbleOverlayWindow()
     qtbot.addWidget(overlay)

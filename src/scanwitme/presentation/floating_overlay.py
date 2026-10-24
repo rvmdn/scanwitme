@@ -337,6 +337,14 @@ class FloatingOverlay(QWidget):
             event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if event.buttons() == Qt.MouseButton.LeftButton and not self._drag_pos.isNull():
+        if (
+            event.buttons() & Qt.MouseButton.LeftButton
+            and hasattr(self, "_drag_pos")
+            and not self._drag_pos.isNull()
+        ):
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self._drag_pos = QPoint()
+        super().mouseReleaseEvent(event)

@@ -6,6 +6,7 @@ import logging
 import re
 
 from PySide6.QtCore import QObject, QPoint, QRect, QRunnable, QThreadPool
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QApplication
 
 from scanwitme.application.cache_service import CacheService
@@ -266,11 +267,37 @@ class ScanWitMeApp(QObject):
             self.main_window.set_status(f"Gagal menangkap layar: {exc}")
             return
 
-        # 2. Position overlay conveniently near the bottom or side of selection if enabled
+        # 2. Position overlay conveniently near the selection within visible screen boundaries
         display_mode = self.settings_repo.get("display_mode", DEFAULT_DISPLAY_MODE)
         if display_mode in ("card", "both"):
-            overlay_x = rect.x
-            overlay_y = rect.bottom + 8
+            center_x = rect.x + rect.width // 2
+            center_y = rect.y + rect.height // 2
+            screen = (
+                QGuiApplication.screenAt(QPoint(center_x, center_y))
+                or QGuiApplication.primaryScreen()
+            )
+            card_w = max(380, self.overlay.width())
+            card_h = max(220, self.overlay.height())
+
+            if screen:
+                screen_geo = screen.availableGeometry()
+                # Vertical positioning: place below if fits, otherwise place above
+                if rect.bottom + 8 + card_h <= screen_geo.bottom():
+                    overlay_y = rect.bottom + 8
+                elif rect.y - card_h - 8 >= screen_geo.top():
+                    overlay_y = rect.y - card_h - 8
+                else:
+                    overlay_y = max(screen_geo.top() + 8, screen_geo.bottom() - card_h - 8)
+
+                # Horizontal positioning: align with left edge, but clamp within screen width
+                overlay_x = min(
+                    max(screen_geo.left() + 8, rect.x),
+                    screen_geo.right() - card_w - 8,
+                )
+            else:
+                overlay_x = rect.x
+                overlay_y = rect.bottom + 8
+
             self.overlay.move(QPoint(overlay_x, overlay_y))
             self.overlay.set_loading("Mengenali teks...")
         else:

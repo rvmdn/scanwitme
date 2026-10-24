@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QImage
 
 from scanwitme.domain.models import Rect
@@ -126,12 +126,30 @@ class LiveAutoScanWatcher(QObject):
         if rect.width <= 0 or rect.height <= 0:
             return None
 
-        screen = QGuiApplication.primaryScreen()
+        center_x = rect.x + rect.width // 2
+        center_y = rect.y + rect.height // 2
+        screen = (
+            QGuiApplication.screenAt(QPoint(center_x, center_y))
+            or QGuiApplication.primaryScreen()
+        )
         if not screen:
             return None
 
+        screen_geo = screen.geometry()
+        rel_x = rect.x - screen_geo.x()
+        rel_y = rect.y - screen_geo.y()
+        crop_x = max(0, rel_x)
+        crop_y = max(0, rel_y)
+        crop_right = min(screen_geo.width(), rel_x + rect.width)
+        crop_bottom = min(screen_geo.height(), rel_y + rect.height)
+        crop_w = max(0, crop_right - crop_x)
+        crop_h = max(0, crop_bottom - crop_y)
+
+        if crop_w <= 0 or crop_h <= 0:
+            return None
+
         try:
-            pixmap = screen.grabWindow(0, rect.x, rect.y, rect.width, rect.height)
+            pixmap = screen.grabWindow(0, crop_x, crop_y, crop_w, crop_h)
             if pixmap.isNull():
                 return None
             img = (

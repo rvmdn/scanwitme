@@ -49,26 +49,40 @@ def cluster_ocr_blocks(
     max_v_gap: int = 24,
     max_h_gap: int = 40,
 ) -> list[list[OCRBlock]]:
-    """Group neighboring dialogue lines into unified speech bubble clusters."""
+    """Group neighboring dialogue lines into unified speech bubble clusters using connected components."""
     if not blocks:
         return []
 
-    clusters: list[list[OCRBlock]] = []
-    for b in blocks:
-        merged = False
-        for c in clusters:
-            for cb in c:
-                v_gap = max(0, b.min_y - cb.max_y, cb.min_y - b.max_y)
-                h_gap = max(0, b.min_x - cb.max_x, cb.min_x - b.max_x)
-                if v_gap <= max_v_gap and h_gap <= max_h_gap:
-                    c.append(b)
-                    merged = True
-                    break
-            if merged:
-                break
-        if not merged:
-            clusters.append([b])
-    return clusters
+    n = len(blocks)
+    parent = list(range(n))
+
+    def find(i: int) -> int:
+        if parent[i] == i:
+            return i
+        parent[i] = find(parent[i])
+        return parent[i]
+
+    def union(i: int, j: int) -> None:
+        root_i = find(i)
+        root_j = find(j)
+        if root_i != root_j:
+            parent[root_i] = root_j
+
+    for i in range(n):
+        b1 = blocks[i]
+        for j in range(i + 1, n):
+            b2 = blocks[j]
+            v_gap = max(0, b1.min_y - b2.max_y, b2.min_y - b1.max_y)
+            h_gap = max(0, b1.min_x - b2.max_x, b2.min_x - b1.max_x)
+            if v_gap <= max_v_gap and h_gap <= max_h_gap:
+                union(i, j)
+
+    groups: dict[int, list[OCRBlock]] = {}
+    for idx, b in enumerate(blocks):
+        root = find(idx)
+        groups.setdefault(root, []).append(b)
+
+    return list(groups.values())
 
 
 class BubbleOverlayWindow(QWidget):
@@ -168,8 +182,10 @@ class BubbleOverlayWindow(QWidget):
             painter.setPen(QPen(border_color, 1.5))
             painter.drawRoundedRect(r, 6, 6)
 
-            # 2. Text Bounds with Padding
-            inner_rect = r.adjusted(4, 3, -4, -3)
+            # 2. Text Bounds with Adaptive Padding
+            pad_h = min(4, max(0, r.width() // 4))
+            pad_v = min(3, max(0, r.height() // 4))
+            inner_rect = r.adjusted(pad_h, pad_v, -pad_h, -pad_v)
 
             # 3. Dynamic Font Typography
             text = bubble.current_text
