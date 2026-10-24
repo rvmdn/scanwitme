@@ -7,6 +7,17 @@ from pathlib import Path
 from typing import Any
 
 from scanwitme.domain.interfaces import SettingsRepository
+from scanwitme.domain.metadata import (
+    DEFAULT_CACHE_ENABLED,
+    DEFAULT_DISPLAY_MODE,
+    DEFAULT_HOTKEY,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_OCR_ENGINE,
+    DEFAULT_SOURCE_LANGUAGE,
+    DEFAULT_TARGET_LANGUAGE,
+    DEFAULT_TEXT_DIRECTION,
+    DEFAULT_TRANSLATION_PROVIDER,
+)
 from scanwitme.infrastructure.settings.config import AppSettings, get_default_config_dir
 
 
@@ -54,14 +65,20 @@ class JsonSettingsRepository(SettingsRepository):
         """Instantiate strongly typed AppSettings from stored values."""
         return AppSettings(
             google_translate_api_key=self.get("google_translate_api_key"),
-            default_source_language=self.get("default_source_language", "auto"),
-            default_target_language=self.get("default_target_language", "id"),
-            default_translation_provider=self.get("default_translation_provider", "free_direct"),
-            display_mode=self.get("display_mode", "both"),
-            text_direction=self.get("text_direction", "auto"),
-            ocr_engine=self.get("ocr_engine", "paddle"),
-            hotkey=self.get("hotkey", "<ctrl>+<shift>+s"),
-            cache_enabled=self.get("cache_enabled", True),
+            default_source_language=self.get(
+                "default_source_language", DEFAULT_SOURCE_LANGUAGE
+            ),
+            default_target_language=self.get(
+                "default_target_language", DEFAULT_TARGET_LANGUAGE
+            ),
+            default_translation_provider=self.get(
+                "default_translation_provider", DEFAULT_TRANSLATION_PROVIDER
+            ),
+            display_mode=self.get("display_mode", DEFAULT_DISPLAY_MODE),
+            text_direction=self.get("text_direction", DEFAULT_TEXT_DIRECTION),
+            ocr_engine=self.get("ocr_engine", DEFAULT_OCR_ENGINE),
+            hotkey=self.get("hotkey", DEFAULT_HOTKEY),
+            cache_enabled=self.get("cache_enabled", DEFAULT_CACHE_ENABLED),
             cache_db_path=self.get("cache_db_path", ""),
-            log_level=self.get("log_level", "INFO"),
+            log_level=self.get("log_level", DEFAULT_LOG_LEVEL),
         )

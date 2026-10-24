@@ -18,6 +18,17 @@ from PySide6.QtWidgets import (
 )
 
 from scanwitme.domain.interfaces import SettingsRepository
+from scanwitme.domain.metadata import (
+    DEFAULT_DISPLAY_MODE,
+    DEFAULT_HOTKEY,
+    DEFAULT_SOURCE_LANGUAGE,
+    DEFAULT_TEXT_DIRECTION,
+    DEFAULT_TRANSLATION_PROVIDER,
+    DISPLAY_MODES,
+    READING_DIRECTIONS,
+    SOURCE_LANGUAGES,
+    TRANSLATION_PROVIDERS,
+)
 from scanwitme.presentation.tray import create_default_tray_icon
 
 logger = logging.getLogger("scanwitme.ui.main")
@@ -206,12 +217,8 @@ class MainWindow(QMainWindow):
         src_label = QLabel("Bahasa Asli:", group)
         src_label.setStyleSheet("color: #94a3b8;")
         self._src_combo = QComboBox(group)
-        self._src_combo.addItem("🔍 Deteksi Otomatis (auto)", "auto")
-        self._src_combo.addItem("Korea (ko)", "ko")
-        self._src_combo.addItem("Mandarin Sederhana (zh-CN)", "zh-CN")
-        self._src_combo.addItem("Mandarin Tradisional (zh-TW)", "zh-TW")
-        self._src_combo.addItem("Jepang (ja)", "ja")
-        self._src_combo.addItem("Inggris (en)", "en")
+        for opt in SOURCE_LANGUAGES:
+            self._src_combo.addItem(opt.label, opt.code)
         self._src_combo.currentIndexChanged.connect(self._on_source_lang_changed)
 
         arrow_label = QLabel("➔", group)
@@ -232,9 +239,8 @@ class MainWindow(QMainWindow):
         prov_label = QLabel("Provider:", group)
         prov_label.setStyleSheet("color: #94a3b8;")
         self._prov_combo = QComboBox(group)
-        self._prov_combo.addItem("⚡ Terjemah Langsung (Gratis / In-App)", "free_direct")
-        self._prov_combo.addItem("🌐 Google Translate Web (Browser)", "web_launcher")
-        self._prov_combo.addItem("🔑 Google Cloud API v2 (Perlu API Key)", "cloud_v2")
+        for opt in TRANSLATION_PROVIDERS:
+            self._prov_combo.addItem(opt.label, opt.id)
         self._prov_combo.currentIndexChanged.connect(self._on_provider_changed)
 
         provider_row.addWidget(prov_label)
@@ -247,9 +253,8 @@ class MainWindow(QMainWindow):
         mode_label = QLabel("Tampilan:", group)
         mode_label.setStyleSheet("color: #94a3b8;")
         self._mode_combo = QComboBox(group)
-        self._mode_combo.addItem("💬 Balon Komik (Direct Bubble)", "bubble")
-        self._mode_combo.addItem("📋 Kartu Pop-up (Floating Card)", "card")
-        self._mode_combo.addItem("🔀 Keduanya (Bubble + Card)", "both")
+        for opt in DISPLAY_MODES:
+            self._mode_combo.addItem(opt.label, opt.id)
         self._mode_combo.currentIndexChanged.connect(self._on_display_mode_changed)
 
         mode_row.addWidget(mode_label)
@@ -262,9 +267,8 @@ class MainWindow(QMainWindow):
         dir_label = QLabel("Arah Baca:", group)
         dir_label.setStyleSheet("color: #94a3b8;")
         self._dir_combo = QComboBox(group)
-        self._dir_combo.addItem("🔄 Otomatis (Smart Detect)", "auto")
-        self._dir_combo.addItem("⛩️ Vertikal Manga Jepang (縦書き)", "vertical")
-        self._dir_combo.addItem("➡️ Horizontal Standar (LTR)", "horizontal")
+        for opt in READING_DIRECTIONS:
+            self._dir_combo.addItem(opt.label, opt.id)
         self._dir_combo.currentIndexChanged.connect(self._on_direction_changed)
 
         dir_row.addWidget(dir_label)
@@ -289,27 +293,27 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
     def _load_settings(self) -> None:
-        src_lang = self._settings_repo.get("default_source_language", "auto")
+        src_lang = self._settings_repo.get("default_source_language", DEFAULT_SOURCE_LANGUAGE)
         idx = self._src_combo.findData(src_lang)
         if idx >= 0:
             self._src_combo.setCurrentIndex(idx)
 
-        provider = self._settings_repo.get("default_translation_provider", "free_direct")
+        provider = self._settings_repo.get("default_translation_provider", DEFAULT_TRANSLATION_PROVIDER)
         idx_p = self._prov_combo.findData(provider)
         if idx_p >= 0:
             self._prov_combo.setCurrentIndex(idx_p)
 
-        display_mode = self._settings_repo.get("display_mode", "both")
+        display_mode = self._settings_repo.get("display_mode", DEFAULT_DISPLAY_MODE)
         idx_m = self._mode_combo.findData(display_mode)
         if idx_m >= 0:
             self._mode_combo.setCurrentIndex(idx_m)
 
-        text_dir = self._settings_repo.get("text_direction", "auto")
+        text_dir = self._settings_repo.get("text_direction", DEFAULT_TEXT_DIRECTION)
         idx_d = self._dir_combo.findData(text_dir)
         if idx_d >= 0:
             self._dir_combo.setCurrentIndex(idx_d)
 
-        hotkey = self._settings_repo.get("hotkey", "<ctrl>+<shift>+s")
+        hotkey = self._settings_repo.get("hotkey", DEFAULT_HOTKEY)
         # Format for display: replace <ctrl> with Ctrl, etc.
         disp = (
             hotkey.replace("<ctrl>", "Ctrl")

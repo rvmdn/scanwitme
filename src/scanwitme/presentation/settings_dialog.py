@@ -17,6 +17,19 @@ from PySide6.QtWidgets import (
 )
 
 from scanwitme.domain.interfaces import CacheRepository, SettingsRepository
+from scanwitme.domain.metadata import (
+    DEFAULT_DISPLAY_MODE,
+    DEFAULT_HOTKEY,
+    DEFAULT_OCR_ENGINE,
+    DEFAULT_SOURCE_LANGUAGE,
+    DEFAULT_TEXT_DIRECTION,
+    DEFAULT_TRANSLATION_PROVIDER,
+    DISPLAY_MODES,
+    OCR_ENGINES,
+    READING_DIRECTIONS,
+    SOURCE_LANGUAGES,
+    TRANSLATION_PROVIDERS,
+)
 
 
 class SettingsDialog(QDialog):
@@ -59,10 +72,8 @@ class SettingsDialog(QDialog):
 
         # Source Language
         self._source_lang_combo = QComboBox(self)
-        self._source_lang_combo.addItem("Korea (ko)", "ko")
-        self._source_lang_combo.addItem("Mandarin Sederhana (zh-CN)", "zh-CN")
-        self._source_lang_combo.addItem("Mandarin Tradisional (zh-TW)", "zh-TW")
-        self._source_lang_combo.addItem("Deteksi Otomatis (auto)", "auto")
+        for opt in SOURCE_LANGUAGES:
+            self._source_lang_combo.addItem(opt.label, opt.code)
         form.addRow("Bahasa Asli:", self._source_lang_combo)
 
         # Target Language
@@ -71,29 +82,26 @@ class SettingsDialog(QDialog):
 
         # Provider
         self._provider_combo = QComboBox(self)
-        self._provider_combo.addItem("Terjemah Langsung (Gratis / In-App)", "free_direct")
-        self._provider_combo.addItem("Google Translate Web Launcher", "web_launcher")
-        self._provider_combo.addItem("Google Cloud Translation API (v2)", "cloud_v2")
+        for opt in TRANSLATION_PROVIDERS:
+            self._provider_combo.addItem(opt.label, opt.id)
         form.addRow("Provider:", self._provider_combo)
 
         # Display Mode
         self._mode_combo = QComboBox(self)
-        self._mode_combo.addItem("💬 Balon Komik (Direct Bubble Overlay)", "bubble")
-        self._mode_combo.addItem("📋 Kartu Pop-up (Floating Overlay)", "card")
-        self._mode_combo.addItem("🔀 Keduanya (Bubble + Kartu)", "both")
+        for opt in DISPLAY_MODES:
+            self._mode_combo.addItem(opt.label, opt.id)
         form.addRow("Mode Tampilan:", self._mode_combo)
 
         # Text Direction
         self._dir_combo = QComboBox(self)
-        self._dir_combo.addItem("🔄 Otomatis (Smart Detect Vertikal/Horizontal)", "auto")
-        self._dir_combo.addItem("⛩️ Vertikal Manga Jepang (縦書き RTL)", "vertical")
-        self._dir_combo.addItem("➡️ Horizontal Standar (LTR)", "horizontal")
+        for opt in READING_DIRECTIONS:
+            self._dir_combo.addItem(opt.label, opt.id)
         form.addRow("Arah Baca:", self._dir_combo)
 
         # OCR Engine
         self._engine_combo = QComboBox(self)
-        self._engine_combo.addItem("PaddleOCR (Bawaan — Multi-Bahasa & Vertikal)", "paddle")
-        self._engine_combo.addItem("Manga-OCR (Khusus Manga Jepang)", "manga_ocr")
+        for opt in OCR_ENGINES:
+            self._engine_combo.addItem(opt.label, opt.id)
         form.addRow("Mesin OCR:", self._engine_combo)
 
         # Hotkey
@@ -138,32 +146,32 @@ class SettingsDialog(QDialog):
         api_key = self._settings_repo.get("google_translate_api_key", "")
         self._api_key_edit.setText(api_key or "")
 
-        src_lang = self._settings_repo.get("default_source_language", "auto")
+        src_lang = self._settings_repo.get("default_source_language", DEFAULT_SOURCE_LANGUAGE)
         idx = self._source_lang_combo.findData(src_lang)
         if idx >= 0:
             self._source_lang_combo.setCurrentIndex(idx)
 
-        provider = self._settings_repo.get("default_translation_provider", "free_direct")
+        provider = self._settings_repo.get("default_translation_provider", DEFAULT_TRANSLATION_PROVIDER)
         idx_p = self._provider_combo.findData(provider)
         if idx_p >= 0:
             self._provider_combo.setCurrentIndex(idx_p)
 
-        mode = self._settings_repo.get("display_mode", "both")
+        mode = self._settings_repo.get("display_mode", DEFAULT_DISPLAY_MODE)
         idx_m = self._mode_combo.findData(mode)
         if idx_m >= 0:
             self._mode_combo.setCurrentIndex(idx_m)
 
-        direction = self._settings_repo.get("text_direction", "auto")
+        direction = self._settings_repo.get("text_direction", DEFAULT_TEXT_DIRECTION)
         idx_d = self._dir_combo.findData(direction)
         if idx_d >= 0:
             self._dir_combo.setCurrentIndex(idx_d)
 
-        engine = self._settings_repo.get("ocr_engine", "paddle")
+        engine = self._settings_repo.get("ocr_engine", DEFAULT_OCR_ENGINE)
         idx_e = self._engine_combo.findData(engine)
         if idx_e >= 0:
             self._engine_combo.setCurrentIndex(idx_e)
 
-        hotkey = self._settings_repo.get("hotkey", "<ctrl>+<shift>+s")
+        hotkey = self._settings_repo.get("hotkey", DEFAULT_HOTKEY)
         self._hotkey_edit.setText(hotkey)
 
     def _on_clear_cache(self) -> None:

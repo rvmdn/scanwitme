@@ -12,6 +12,14 @@ from scanwitme.application.cache_service import CacheService
 from scanwitme.application.controller import ScanController
 from scanwitme.application.workflow import TranslationWorkflow
 from scanwitme.domain.errors import CaptureError
+from scanwitme.domain.metadata import (
+    DEFAULT_DISPLAY_MODE,
+    DEFAULT_OCR_ENGINE,
+    DEFAULT_SOURCE_LANGUAGE,
+    DEFAULT_TARGET_LANGUAGE,
+    DEFAULT_TEXT_DIRECTION,
+    DEFAULT_TRANSLATION_PROVIDER,
+)
 from scanwitme.domain.models import OCRBlock, Rect, ScanState, TranslationResult
 from scanwitme.infrastructure.cache.sqlite_cache import SQLiteCacheRepository
 from scanwitme.infrastructure.capture.qt_capture import QtScreenCaptureProvider
@@ -259,7 +267,7 @@ class ScanWitMeApp(QObject):
             return
 
         # 2. Position overlay conveniently near the bottom or side of selection if enabled
-        display_mode = self.settings_repo.get("display_mode", "both")
+        display_mode = self.settings_repo.get("display_mode", DEFAULT_DISPLAY_MODE)
         if display_mode in ("card", "both"):
             overlay_x = rect.x
             overlay_y = rect.bottom + 8
@@ -269,9 +277,9 @@ class ScanWitMeApp(QObject):
             self.overlay.hide()
 
         # 3. Dispatch OCR worker to thread pool
-        source_lang = self.settings_repo.get("default_source_language", "auto")
-        text_direction = self.settings_repo.get("text_direction", "auto")
-        ocr_engine_name = self.settings_repo.get("ocr_engine", "paddle")
+        source_lang = self.settings_repo.get("default_source_language", DEFAULT_SOURCE_LANGUAGE)
+        text_direction = self.settings_repo.get("text_direction", DEFAULT_TEXT_DIRECTION)
+        ocr_engine_name = self.settings_repo.get("ocr_engine", DEFAULT_OCR_ENGINE)
         active_ocr_provider = (
             self.manga_ocr_provider
             if ocr_engine_name == "manga_ocr" and self.manga_ocr_provider.is_available()
@@ -296,9 +304,13 @@ class ScanWitMeApp(QObject):
         if not self.controller.on_ocr_completed(session_id, blocks, ocr_duration_ms):
             return
 
-        provider_name = self.settings_repo.get("default_translation_provider", "free_direct")
-        configured_source_lang = self.settings_repo.get("default_source_language", "auto")
-        target_lang = "id"
+        provider_name = self.settings_repo.get(
+            "default_translation_provider", DEFAULT_TRANSLATION_PROVIDER
+        )
+        configured_source_lang = self.settings_repo.get(
+            "default_source_language", DEFAULT_SOURCE_LANGUAGE
+        )
+        target_lang = DEFAULT_TARGET_LANGUAGE
 
         combined_text = " ".join(b.text.strip() for b in blocks if b.text.strip())
 
@@ -363,7 +375,7 @@ class ScanWitMeApp(QObject):
         ):
             return
 
-        display_mode = self.settings_repo.get("display_mode", "both")
+        display_mode = self.settings_repo.get("display_mode", DEFAULT_DISPLAY_MODE)
         session = self.controller.current_session
         capture_rect = (
             session.capture.bounds
@@ -408,7 +420,7 @@ class ScanWitMeApp(QObject):
             return []
 
         # Determine reading direction (Japanese manga dialogue reads Right-to-Left)
-        text_dir = self.settings_repo.get("text_direction", "auto")
+        text_dir = self.settings_repo.get("text_direction", DEFAULT_TEXT_DIRECTION)
         is_vert = (
             text_dir == "vertical"
             or (text_dir == "auto" and any((b.max_y - b.min_y) > 1.2 * (b.max_x - b.min_x) for b in blocks))
@@ -509,7 +521,7 @@ class ScanWitMeApp(QObject):
         if not self.controller.on_error(session_id, error_message):
             return
 
-        display_mode = self.settings_repo.get("display_mode", "both")
+        display_mode = self.settings_repo.get("display_mode", DEFAULT_DISPLAY_MODE)
         if display_mode in ("card", "both") and not self.live_watcher.is_active:
             self.overlay.set_error(error_message)
         self.main_window.set_status(f"Error: {error_message}")

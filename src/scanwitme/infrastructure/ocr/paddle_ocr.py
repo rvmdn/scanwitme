@@ -34,20 +34,16 @@ try:
 except Exception:
     pass
 
+from scanwitme.domain.metadata import get_language_to_ocr_mapping
+
 logger = logging.getLogger("scanwitme.ocr")
 
-LANGUAGE_MAPPING = {
+LANGUAGE_MAPPING: dict[str, str] = get_language_to_ocr_mapping()
+LANGUAGE_MAPPING.update({
     "auto": "auto",
-    "ko": "korean",
-    "korean": "korean",
     "zh": "ch",
-    "zh-CN": "ch",
     "zh-TW": "chinese_cht",
-    "chinese": "ch",
-    "ja": "japan",
-    "japan": "japan",
-    "en": "en",
-}
+})
 
 
 def detect_script(text: str) -> str:

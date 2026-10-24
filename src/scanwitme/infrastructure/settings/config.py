@@ -6,6 +6,24 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from scanwitme.domain.metadata import (
+    DEFAULT_CACHE_ENABLED,
+    DEFAULT_DISPLAY_MODE,
+    DEFAULT_HOTKEY,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_OCR_ENGINE,
+    DEFAULT_SOURCE_LANGUAGE,
+    DEFAULT_TARGET_LANGUAGE,
+    DEFAULT_TEXT_DIRECTION,
+    DEFAULT_TRANSLATION_PROVIDER,
+    get_valid_display_modes,
+    get_valid_ocr_engines,
+    get_valid_provider_ids,
+    get_valid_reading_directions,
+    get_valid_source_codes,
+    get_valid_target_codes,
+)
+
 
 def get_default_config_dir() -> Path:
     """Return platform-standard directory for storing ScanWitMe settings."""
@@ -24,16 +42,16 @@ class AppSettings:
     """Strongly typed application settings."""
 
     google_translate_api_key: str | None = None
-    default_source_language: str = "auto"
-    default_target_language: str = "id"
-    default_translation_provider: str = "free_direct"  # "free_direct", "web_launcher", or "cloud_v2"
-    display_mode: str = "both"  # "bubble" (manga inpainting), "card" (floating popup), or "both"
-    text_direction: str = "auto"  # "auto" (smart detect), "vertical" (Japanese manga), or "horizontal"
-    ocr_engine: str = "paddle"  # "paddle" (built-in multi-lang & vertical) or "manga_ocr"
-    hotkey: str = "<ctrl>+<shift>+s"
-    cache_enabled: bool = True
+    default_source_language: str = DEFAULT_SOURCE_LANGUAGE
+    default_target_language: str = DEFAULT_TARGET_LANGUAGE
+    default_translation_provider: str = DEFAULT_TRANSLATION_PROVIDER
+    display_mode: str = DEFAULT_DISPLAY_MODE
+    text_direction: str = DEFAULT_TEXT_DIRECTION
+    ocr_engine: str = DEFAULT_OCR_ENGINE
+    hotkey: str = DEFAULT_HOTKEY
+    cache_enabled: bool = DEFAULT_CACHE_ENABLED
     cache_db_path: str = ""
-    log_level: str = "INFO"
+    log_level: str = DEFAULT_LOG_LEVEL
 
     def __post_init__(self) -> None:
         # Load from environment variables if not explicitly provided
@@ -43,27 +61,21 @@ class AppSettings:
         if not self.cache_db_path:
             self.cache_db_path = str(get_default_config_dir() / "scanwitme_cache.db")
 
-        # Validate language codes
-        valid_sources = {"ko", "zh-CN", "zh-TW", "ja", "en", "auto"}
-        if self.default_source_language not in valid_sources:
-            self.default_source_language = "auto"
+        # Validate against parameterized metadata
+        if self.default_source_language not in get_valid_source_codes():
+            self.default_source_language = DEFAULT_SOURCE_LANGUAGE
 
-        if self.default_target_language != "id":
-            # MVP target is Indonesian
-            self.default_target_language = "id"
+        if self.default_target_language not in get_valid_target_codes():
+            self.default_target_language = DEFAULT_TARGET_LANGUAGE
 
-        valid_providers = {"free_direct", "web_launcher", "cloud_v2"}
-        if self.default_translation_provider not in valid_providers:
-            self.default_translation_provider = "free_direct"
+        if self.default_translation_provider not in get_valid_provider_ids():
+            self.default_translation_provider = DEFAULT_TRANSLATION_PROVIDER
 
-        valid_directions = {"auto", "vertical", "horizontal"}
-        if self.text_direction not in valid_directions:
-            self.text_direction = "auto"
+        if self.text_direction not in get_valid_reading_directions():
+            self.text_direction = DEFAULT_TEXT_DIRECTION
 
-        valid_engines = {"paddle", "manga_ocr"}
-        if self.ocr_engine not in valid_engines:
-            self.ocr_engine = "paddle"
+        if self.ocr_engine not in get_valid_ocr_engines():
+            self.ocr_engine = DEFAULT_OCR_ENGINE
 
-        valid_display_modes = {"bubble", "card", "both"}
-        if self.display_mode not in valid_display_modes:
-            self.display_mode = "bubble"
+        if self.display_mode not in get_valid_display_modes():
+            self.display_mode = DEFAULT_DISPLAY_MODE

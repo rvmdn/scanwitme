@@ -1,7 +1,7 @@
 """UI tests for RegionSelector widget."""
 
 import pytest
-from PySide6.QtCore import QPoint, QPointF, Qt
+from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QKeyEvent, QMouseEvent
 from pytestqt.qtbot import QtBot
 
