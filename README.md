@@ -4,16 +4,18 @@
 
 ## Features (v1.0)
 
-- **Mode Live Auto-Scan**: Otomatis mendeteksi saat halaman komik di-scroll dan langsung menerjemahkan panel baru tanpa perlu menekan tombol berulang kali.
-- **In-App Direct Free Translation**: Translates recognized dialogue directly inside the floating tool into Indonesian with zero setup and no API key required.
-- **Sniper Frame Mode**: Floating viewfinder frame that stays over your comic/manga, ready to scan repeatedly with one click or `Enter`.
-- **Auto Language Detection**: Automatically recognizes Mandarin (Hanzi), Korean (Hangul), Japanese (Kana), and English scripts.
-- **Global Hotkey & Fast Selection**: Press `Ctrl+Shift+S` anywhere in Windows to trigger rectangular selection.
-- **Local OCR via PaddleOCR**: Runs 100% locally on your machine with high accuracy for Asian scripts.
-- **Floating Translation Overlay**: Frameless, movable, always-on-top card displaying both original and translated text with 1-click copy buttons.
-- **Multi-Provider & Web Fallbacks**: Quick buttons for Google Search, Google Translate Web, and Google Lens. Also supports Google Cloud Translation v2 with private API keys.
-- **Smart Caching**: Persistent SQLite cache prevents redundant translation requests for repeated dialogue.
-- **Privacy & Security**: Zero transmission of raw screenshots to external servers; screenshots are processed locally on device.
+- **🔄 Mode Live Auto-Scan**: Otomatis mendeteksi saat halaman komik di-scroll dan langsung menerjemahkan panel baru tanpa perlu menekan tombol berulang kali.
+- **💬 Direct Comic Bubble Inpainting**: Menempelkan teks terjemahan Bahasa Indonesia langsung di atas balon percakapan asli manga/manhwa dengan tipografi khas komik, penskalaan font otomatis, dan fitur *click-to-peek* untuk melihat teks aslinya.
+- **⛩️ Manga-OCR & Teks Vertikal Jepang (縦書き)**: Deteksi otomatis orientasi vertikal (*Smart Detect*) dan pengurutan kolom tradisional Jepang dari Kanan ke Kiri (*Right-to-Left*) serta baris Atas ke Bawah (*Top-to-Bottom*).
+- **⚡ In-App Direct Free Translation**: Menerjemahkan dialog langsung di dalam aplikasi ke Bahasa Indonesia secara instan tanpa perlu mendaftar atau memiliki API key.
+- **🎯 Bingkai Pemindai (Sniper Frame Mode)**: Jendela bidik transparan yang mengambang di atas komik, siap memindai area pilihan berulang kali dengan satu klik atau tombol `Enter`.
+- **🔍 Deteksi Bahasa Otomatis**: Mendeteksi skrip Korea (Hangul), Mandarin (Hanzi), Jepang (Kana/Kanji), dan Latin secara otomatis.
+- **⌨️ Global Hotkey & Seleksi Cepat**: Tekan `Ctrl+Shift+S` di mana saja di Windows untuk memicu seleksi area persegi.
+- **🧠 OCR Lokal Cepat (PaddleOCR & Manga-OCR)**: Berjalan 100% lokal di komputer tanpa mengirimkan gambar ke internet demi privasi data dan kecepatan maksimal.
+- **📋 Floating Translation Card**: Kartu pop-up mengambang dan dapat digeser yang menampilkan teks asli dan terjemahan dengan tombol 1-klik salin (*copy*).
+- **🌐 Integrasi Multi-Provider & Web Fallbacks**: Tombol akses cepat ke Google Search, Google Translate Web, dan Google Lens, serta dukungan opsional untuk Google Cloud Translation v2 dengan kunci API pribadi.
+- **💾 Smart Caching (SQLite)**: Cache persisten lokal mencegah permintaan terjemahan berulang untuk menghemat kuota dan mempercepat pembacaan.
+- **🧩 Arsitektur Metadata Terpusat**: Seluruh opsi bahasa, provider, dan mode terparameterisasi secara modular (*Single Source of Truth*).
 
 ## Requirements
 
