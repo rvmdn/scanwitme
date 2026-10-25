@@ -17,117 +17,31 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scanwitme.domain.i18n import tr
 from scanwitme.domain.interfaces import SettingsRepository
 from scanwitme.domain.metadata import (
+    APP_THEMES,
+    APP_UI_LANGUAGES,
     DEFAULT_DISPLAY_MODE,
     DEFAULT_HOTKEY,
     DEFAULT_SOURCE_LANGUAGE,
+    DEFAULT_TARGET_LANGUAGE,
     DEFAULT_TEXT_DIRECTION,
+    DEFAULT_THEME,
     DEFAULT_TRANSLATION_PROVIDER,
+    DEFAULT_UI_LANGUAGE,
     DISPLAY_MODES,
     READING_DIRECTIONS,
     SOURCE_LANGUAGES,
+    TARGET_LANGUAGES,
     TRANSLATION_PROVIDERS,
 )
+from scanwitme.presentation.theme import get_theme_stylesheet
 from scanwitme.presentation.tray import create_default_tray_icon
 
 logger = logging.getLogger("scanwitme.ui.main")
 
-MAIN_STYLESHEET = """
-QMainWindow {
-    background-color: #0f172a;
-}
-
-QWidget#centralWidget {
-    background-color: #0f172a;
-}
-
-QLabel#appTitle {
-    color: #f8fafc;
-    font-size: 18px;
-    font-weight: 700;
-}
-
-QLabel#badge {
-    background-color: #1e293b;
-    color: #38bdf8;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 2px 8px;
-    font-size: 11px;
-    font-weight: 600;
-}
-
-QLabel#statusText {
-    color: #94a3b8;
-    font-size: 12px;
-}
-
-QGroupBox {
-    color: #cbd5e1;
-    font-size: 12px;
-    font-weight: 600;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    margin-top: 10px;
-    padding-top: 12px;
-}
-
-QGroupBox::title {
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
-    left: 12px;
-    padding: 0 4px;
-}
-
-QPushButton#scanButton {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563eb, stop:1 #3b82f6);
-    color: #ffffff;
-    font-size: 14px;
-    font-weight: 600;
-    border-radius: 8px;
-    padding: 12px 20px;
-    border: 1px solid #60a5fa;
-}
-
-QPushButton#scanButton:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1d4ed8, stop:1 #2563eb);
-}
-
-QPushButton#scanButton:pressed {
-    background: #1e40af;
-}
-
-QPushButton#secondaryButton {
-    background-color: #1e293b;
-    color: #cbd5e1;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12px;
-}
-
-QPushButton#secondaryButton:hover {
-    background-color: #334155;
-    color: #f8fafc;
-}
-
-QComboBox {
-    background-color: #1e293b;
-    color: #f8fafc;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 12px;
-}
-
-QComboBox QAbstractItemView {
-    background-color: #1e293b;
-    color: #f8fafc;
-    selection-background-color: #2563eb;
-    border: 1px solid #334155;
-}
-"""
+MAIN_STYLESHEET = get_theme_stylesheet("dark")
 
 
 class MainWindow(QMainWindow):
@@ -137,7 +51,11 @@ class MainWindow(QMainWindow):
     toggle_frame_requested = Signal()
     auto_scan_toggled = Signal(bool)
     settings_requested = Signal()
+    history_requested = Signal()
     source_language_changed = Signal(str)
+    target_language_changed = Signal(str)
+    ui_language_changed = Signal(str)
+    theme_changed = Signal(str)
     provider_changed = Signal(str)
     display_mode_changed = Signal(str)
     text_direction_changed = Signal(str)
@@ -149,7 +67,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ScanWitMe PC — Screen Translator")
         self.setWindowIcon(create_default_tray_icon())
         self.setStyleSheet(MAIN_STYLESHEET)
-        self.setFixedSize(500, 440)
+        self.setFixedSize(520, 485)
 
         self._build_ui()
         self._load_settings()
@@ -165,11 +83,17 @@ class MainWindow(QMainWindow):
         header_layout = QHBoxLayout()
         title_label = QLabel("ScanWitMe", central)
         title_label.setObjectName("appTitle")
-        badge_label = QLabel("PC MVP", central)
-        badge_label.setObjectName("badge")
+        self._badge_label = QLabel(tr("badge", DEFAULT_UI_LANGUAGE), central)
+        self._badge_label.setObjectName("badge")
         header_layout.addWidget(title_label)
-        header_layout.addWidget(badge_label)
+        header_layout.addWidget(self._badge_label)
         header_layout.addStretch()
+
+        self._history_btn = QPushButton("📚 Riwayat", central)
+        self._history_btn.setObjectName("secondaryButton")
+        self._history_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._history_btn.clicked.connect(self.history_requested.emit)
+        header_layout.addWidget(self._history_btn)
 
         self._settings_btn = QPushButton("⚙ Pengaturan", central)
         self._settings_btn.setObjectName("secondaryButton")
@@ -224,13 +148,15 @@ class MainWindow(QMainWindow):
         arrow_label = QLabel("➔", group)
         arrow_label.setStyleSheet("color: #38bdf8; font-weight: bold;")
 
-        tgt_label = QLabel("Indonesia (id)", group)
-        tgt_label.setStyleSheet("color: #f8fafc; font-weight: 600;")
+        self._tgt_combo = QComboBox(group)
+        for opt in TARGET_LANGUAGES:
+            self._tgt_combo.addItem(opt.label, opt.code)
+        self._tgt_combo.currentIndexChanged.connect(self._on_target_lang_changed)
 
         lang_row.addWidget(src_label)
         lang_row.addWidget(self._src_combo)
         lang_row.addWidget(arrow_label)
-        lang_row.addWidget(tgt_label)
+        lang_row.addWidget(self._tgt_combo)
         lang_row.addStretch()
         group_layout.addLayout(lang_row)
 
@@ -276,6 +202,36 @@ class MainWindow(QMainWindow):
         dir_row.addStretch()
         group_layout.addLayout(dir_row)
 
+        # UI Language & Theme row
+        pref_row = QHBoxLayout()
+        self._ui_label = QLabel("Bahasa UI:", group)
+        self._ui_label.setStyleSheet("color: #94a3b8;")
+        self._ui_combo = QComboBox(group)
+        for opt in APP_UI_LANGUAGES:
+            self._ui_combo.addItem(opt.label, opt.code)
+        self._ui_combo.currentIndexChanged.connect(self._on_ui_lang_changed)
+
+        self._theme_label = QLabel("Tema:", group)
+        self._theme_label.setStyleSheet("color: #94a3b8;")
+        self._theme_combo = QComboBox(group)
+        for opt in APP_THEMES:
+            self._theme_combo.addItem(opt.label, opt.id)
+        self._theme_combo.currentIndexChanged.connect(self._on_theme_changed)
+
+        pref_row.addWidget(self._ui_label)
+        pref_row.addWidget(self._ui_combo)
+        pref_row.addSpacing(10)
+        pref_row.addWidget(self._theme_label)
+        pref_row.addWidget(self._theme_combo)
+        pref_row.addStretch()
+        group_layout.addLayout(pref_row)
+
+        self._group_box = group
+        self._src_label = src_label
+        self._prov_label = prov_label
+        self._mode_label = mode_label
+        self._dir_label = dir_label
+
         layout.addWidget(group)
 
         # Status and hotkey indicator footer
@@ -298,7 +254,14 @@ class MainWindow(QMainWindow):
         if idx >= 0:
             self._src_combo.setCurrentIndex(idx)
 
-        provider = self._settings_repo.get("default_translation_provider", DEFAULT_TRANSLATION_PROVIDER)
+        tgt_lang = self._settings_repo.get("default_target_language", DEFAULT_TARGET_LANGUAGE)
+        idx_t = self._tgt_combo.findData(tgt_lang)
+        if idx_t >= 0:
+            self._tgt_combo.setCurrentIndex(idx_t)
+
+        provider = self._settings_repo.get(
+            "default_translation_provider", DEFAULT_TRANSLATION_PROVIDER
+        )
         idx_p = self._prov_combo.findData(provider)
         if idx_p >= 0:
             self._prov_combo.setCurrentIndex(idx_p)
@@ -313,6 +276,19 @@ class MainWindow(QMainWindow):
         if idx_d >= 0:
             self._dir_combo.setCurrentIndex(idx_d)
 
+        ui_lang = self._settings_repo.get("default_ui_language", DEFAULT_UI_LANGUAGE)
+        idx_u = self._ui_combo.findData(ui_lang)
+        if idx_u >= 0:
+            self._ui_combo.setCurrentIndex(idx_u)
+
+        theme = self._settings_repo.get("default_theme", DEFAULT_THEME)
+        idx_th = self._theme_combo.findData(theme)
+        if idx_th >= 0:
+            self._theme_combo.setCurrentIndex(idx_th)
+        self.apply_theme(theme)
+
+        self.retranslate_ui()
+
         hotkey = self._settings_repo.get("hotkey", DEFAULT_HOTKEY)
         # Format for display: replace <ctrl> with Ctrl, etc.
         disp = (
@@ -326,6 +302,17 @@ class MainWindow(QMainWindow):
     def update_from_settings(self) -> None:
         """Refresh UI state when settings change."""
         self._load_settings()
+
+    def apply_theme(self, theme_id: str) -> None:
+        """Apply Qt stylesheet corresponding to theme."""
+        self.setStyleSheet(get_theme_stylesheet(theme_id))
+
+    def _on_theme_changed(self) -> None:
+        theme = self._theme_combo.currentData()
+        self._settings_repo.set("default_theme", theme)
+        self._settings_repo.save()
+        self.apply_theme(theme)
+        self.theme_changed.emit(theme)
 
     def set_auto_scan_active(self, active: bool) -> None:
         """Update Live Auto-Scan button text and visual state."""
@@ -356,6 +343,67 @@ class MainWindow(QMainWindow):
         self._settings_repo.set("default_source_language", lang)
         self._settings_repo.save()
         self.source_language_changed.emit(lang)
+
+    def _on_target_lang_changed(self) -> None:
+        lang = self._tgt_combo.currentData()
+        self._settings_repo.set("default_target_language", lang)
+        self._settings_repo.save()
+        self.target_language_changed.emit(lang)
+
+    def _on_ui_lang_changed(self) -> None:
+        lang = self._ui_combo.currentData()
+        self._settings_repo.set("default_ui_language", lang)
+        self._settings_repo.save()
+        self.retranslate_ui()
+        self.ui_language_changed.emit(lang)
+
+    def retranslate_ui(self) -> None:
+        """Update all UI text according to currently configured UI language."""
+        lang = self._settings_repo.get("default_ui_language", DEFAULT_UI_LANGUAGE)
+        self.setWindowTitle(tr("app_title", lang))
+        if hasattr(self, "_badge_label"):
+            self._badge_label.setText(tr("badge", lang))
+        if hasattr(self, "_history_btn"):
+            self._history_btn.setText(tr("btn_history", lang))
+        self._settings_btn.setText(tr("btn_settings", lang))
+        self._scan_btn.setText(f"{tr('btn_scan', lang)} (Ctrl+Shift+S)")
+        self._frame_btn.setText(tr("btn_sniper", lang))
+        if not getattr(self, "_auto_active", False):
+            self._auto_btn.setText(tr("btn_live", lang))
+        if hasattr(self, "_group_box"):
+            self._group_box.setTitle(tr("quick_settings", lang))
+        if hasattr(self, "_src_label"):
+            self._src_label.setText(tr("label_source_lang", lang))
+        if hasattr(self, "_prov_label"):
+            self._prov_label.setText(tr("label_provider", lang))
+        if hasattr(self, "_mode_label"):
+            self._mode_label.setText(tr("label_display_mode", lang))
+        if hasattr(self, "_dir_label"):
+            self._dir_label.setText(tr("label_direction", lang))
+        if hasattr(self, "_ui_label"):
+            self._ui_label.setText(tr("label_ui_lang", lang))
+        if hasattr(self, "_theme_label"):
+            self._theme_label.setText(tr("label_theme", lang))
+
+        # Update metadata combo box item labels dynamically
+        if hasattr(self, "_src_combo"):
+            for i, opt in enumerate(SOURCE_LANGUAGES):
+                self._src_combo.setItemText(i, opt.get_label(lang))
+        if hasattr(self, "_tgt_combo"):
+            for i, opt in enumerate(TARGET_LANGUAGES):
+                self._tgt_combo.setItemText(i, opt.get_label(lang))
+        if hasattr(self, "_prov_combo"):
+            for i, opt in enumerate(TRANSLATION_PROVIDERS):
+                self._prov_combo.setItemText(i, opt.get_label(lang))
+        if hasattr(self, "_mode_combo"):
+            for i, opt in enumerate(DISPLAY_MODES):
+                self._mode_combo.setItemText(i, opt.get_label(lang))
+        if hasattr(self, "_dir_combo"):
+            for i, opt in enumerate(READING_DIRECTIONS):
+                self._dir_combo.setItemText(i, opt.get_label(lang))
+        if hasattr(self, "_theme_combo"):
+            for i, opt in enumerate(APP_THEMES):
+                self._theme_combo.setItemText(i, opt.get_label(lang))
 
     def _on_provider_changed(self) -> None:
         provider = self._prov_combo.currentData()

@@ -40,6 +40,7 @@ class TrayManager(QObject):
 
     scan_requested = Signal()
     show_main_requested = Signal()
+    history_requested = Signal()
     settings_requested = Signal()
     exit_requested = Signal()
 
@@ -64,6 +65,10 @@ class TrayManager(QObject):
         self._show_action = QAction("Buka ScanWitMe", menu)
         self._show_action.triggered.connect(self.show_main_requested.emit)
         menu.addAction(self._show_action)
+
+        self._history_action = QAction("📚 Riwayat Dialog...", menu)
+        self._history_action.triggered.connect(self.history_requested.emit)
+        menu.addAction(self._history_action)
 
         self._settings_action = QAction("Pengaturan...", menu)
         self._settings_action.triggered.connect(self.settings_requested.emit)

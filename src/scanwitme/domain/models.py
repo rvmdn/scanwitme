@@ -113,3 +113,16 @@ class ScanSession:
     def combined_source_text(self) -> str:
         """Concatenates all OCR blocks according to reading order."""
         return " ".join(block.text.strip() for block in self.ocr_blocks if block.text.strip())
+
+
+@dataclass
+class HistoryItem:
+    """Historical comic dialogue scan result with bookmark and search support."""
+
+    id: str
+    source_text: str
+    translated_text: str
+    source_lang: str
+    target_lang: str
+    timestamp: float
+    is_favorite: bool = False

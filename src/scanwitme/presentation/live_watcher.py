@@ -129,8 +129,7 @@ class LiveAutoScanWatcher(QObject):
         center_x = rect.x + rect.width // 2
         center_y = rect.y + rect.height // 2
         screen = (
-            QGuiApplication.screenAt(QPoint(center_x, center_y))
-            or QGuiApplication.primaryScreen()
+            QGuiApplication.screenAt(QPoint(center_x, center_y)) or QGuiApplication.primaryScreen()
         )
         if not screen:
             return None

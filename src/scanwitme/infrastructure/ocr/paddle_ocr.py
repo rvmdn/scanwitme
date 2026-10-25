@@ -39,11 +39,13 @@ from scanwitme.domain.metadata import get_language_to_ocr_mapping
 logger = logging.getLogger("scanwitme.ocr")
 
 LANGUAGE_MAPPING: dict[str, str] = get_language_to_ocr_mapping()
-LANGUAGE_MAPPING.update({
-    "auto": "auto",
-    "zh": "ch",
-    "zh-TW": "chinese_cht",
-})
+LANGUAGE_MAPPING.update(
+    {
+        "auto": "auto",
+        "zh": "ch",
+        "zh-TW": "chinese_cht",
+    }
+)
 
 
 def detect_script(text: str) -> str:

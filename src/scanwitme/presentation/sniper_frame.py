@@ -100,7 +100,9 @@ class SniperFrame(QWidget):
         # Auto-Scan (Live) Toggle Button
         self._auto_btn = QPushButton("🔄 Auto: OFF", self._top_bar)
         self._auto_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._auto_btn.setToolTip("Mode Live: Otomatis mendeteksi saat komik di-scroll dan menerjemahkan.")
+        self._auto_btn.setToolTip(
+            "Mode Live: Otomatis mendeteksi saat komik di-scroll dan menerjemahkan."
+        )
         self._update_auto_btn_style()
         self._auto_btn.clicked.connect(self._toggle_auto_scan_clicked)
         bar_layout.addWidget(self._auto_btn)

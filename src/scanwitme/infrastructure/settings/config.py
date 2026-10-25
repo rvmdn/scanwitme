@@ -15,13 +15,17 @@ from scanwitme.domain.metadata import (
     DEFAULT_SOURCE_LANGUAGE,
     DEFAULT_TARGET_LANGUAGE,
     DEFAULT_TEXT_DIRECTION,
+    DEFAULT_THEME,
     DEFAULT_TRANSLATION_PROVIDER,
+    DEFAULT_UI_LANGUAGE,
     get_valid_display_modes,
     get_valid_ocr_engines,
     get_valid_provider_ids,
     get_valid_reading_directions,
     get_valid_source_codes,
     get_valid_target_codes,
+    get_valid_theme_ids,
+    get_valid_ui_language_codes,
 )
 
 
@@ -44,6 +48,8 @@ class AppSettings:
     google_translate_api_key: str | None = None
     default_source_language: str = DEFAULT_SOURCE_LANGUAGE
     default_target_language: str = DEFAULT_TARGET_LANGUAGE
+    default_ui_language: str = DEFAULT_UI_LANGUAGE
+    default_theme: str = DEFAULT_THEME
     default_translation_provider: str = DEFAULT_TRANSLATION_PROVIDER
     display_mode: str = DEFAULT_DISPLAY_MODE
     text_direction: str = DEFAULT_TEXT_DIRECTION
@@ -51,6 +57,7 @@ class AppSettings:
     hotkey: str = DEFAULT_HOTKEY
     cache_enabled: bool = DEFAULT_CACHE_ENABLED
     cache_db_path: str = ""
+    history_db_path: str = ""
     log_level: str = DEFAULT_LOG_LEVEL
 
     def __post_init__(self) -> None:
@@ -61,12 +68,21 @@ class AppSettings:
         if not self.cache_db_path:
             self.cache_db_path = str(get_default_config_dir() / "scanwitme_cache.db")
 
+        if not self.history_db_path:
+            self.history_db_path = str(get_default_config_dir() / "scanwitme_history.db")
+
         # Validate against parameterized metadata
         if self.default_source_language not in get_valid_source_codes():
             self.default_source_language = DEFAULT_SOURCE_LANGUAGE
 
         if self.default_target_language not in get_valid_target_codes():
             self.default_target_language = DEFAULT_TARGET_LANGUAGE
+
+        if self.default_ui_language not in get_valid_ui_language_codes():
+            self.default_ui_language = DEFAULT_UI_LANGUAGE
+
+        if self.default_theme not in get_valid_theme_ids():
+            self.default_theme = DEFAULT_THEME
 
         if self.default_translation_provider not in get_valid_provider_ids():
             self.default_translation_provider = DEFAULT_TRANSLATION_PROVIDER

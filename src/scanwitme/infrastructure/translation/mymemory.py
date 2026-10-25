@@ -212,4 +212,3 @@ class MyMemoryTranslationProvider(TranslationProvider):
             if status == 429:
                 raise QuotaExceededError("Rate limit / kuota server tercapai.")
             raise TranslationError(f"Server terjemahan mengembalikan kode HTTP {status}")
-

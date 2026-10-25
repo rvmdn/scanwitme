@@ -16,7 +16,9 @@ from scanwitme.domain.metadata import (
     DEFAULT_SOURCE_LANGUAGE,
     DEFAULT_TARGET_LANGUAGE,
     DEFAULT_TEXT_DIRECTION,
+    DEFAULT_THEME,
     DEFAULT_TRANSLATION_PROVIDER,
+    DEFAULT_UI_LANGUAGE,
 )
 from scanwitme.infrastructure.settings.config import AppSettings, get_default_config_dir
 
@@ -65,12 +67,10 @@ class JsonSettingsRepository(SettingsRepository):
         """Instantiate strongly typed AppSettings from stored values."""
         return AppSettings(
             google_translate_api_key=self.get("google_translate_api_key"),
-            default_source_language=self.get(
-                "default_source_language", DEFAULT_SOURCE_LANGUAGE
-            ),
-            default_target_language=self.get(
-                "default_target_language", DEFAULT_TARGET_LANGUAGE
-            ),
+            default_source_language=self.get("default_source_language", DEFAULT_SOURCE_LANGUAGE),
+            default_target_language=self.get("default_target_language", DEFAULT_TARGET_LANGUAGE),
+            default_ui_language=self.get("default_ui_language", DEFAULT_UI_LANGUAGE),
+            default_theme=self.get("default_theme", DEFAULT_THEME),
             default_translation_provider=self.get(
                 "default_translation_provider", DEFAULT_TRANSLATION_PROVIDER
             ),

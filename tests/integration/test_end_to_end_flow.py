@@ -88,7 +88,15 @@ def test_full_application_flow(
     assert cached is not None
     assert cached.translated_text == "Halo ini terjemahan manga"
 
-    # 6. Test copy action
+    # 6. Verify history auto-recording
+    history_items = app.history_repo.get_items("ALL")
+    assert len(history_items) == 1
+    assert history_items[0].source_text == "안녕하세요 만화 번역입니다"
+    assert history_items[0].translated_text == "Halo ini terjemahan manga"
+    assert history_items[0].source_lang == "ko"
+    assert history_items[0].target_lang == "id"
+
+    # 7. Test copy action
     with qtbot.waitSignal(app.overlay.copy_translation_requested, timeout=1000) as blocker:
         app.overlay._copy_tgt_btn.click()
     assert blocker.args == ["Halo ini terjemahan manga"]
@@ -96,9 +104,7 @@ def test_full_application_flow(
 
 
 @pytest.mark.integration
-def test_free_direct_flow(
-    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_free_direct_flow(qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APPDATA", str(tmp_path))
 
     q_app = QApplication.instance() or QApplication([])
@@ -143,4 +149,3 @@ def test_free_direct_flow(
     assert app.overlay._source_label.text() == "渐的意识到自己"
     assert app.overlay._translated_label.text() == "Secara bertahap menyadari diri"
     assert "free_direct" in app.overlay._status_label.text()
-

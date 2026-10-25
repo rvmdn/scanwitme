@@ -3,12 +3,14 @@
 import pytest
 
 from scanwitme.domain.metadata import (
+    APP_THEMES,
     DEFAULT_DISPLAY_MODE,
     DEFAULT_HOTKEY,
     DEFAULT_OCR_ENGINE,
     DEFAULT_SOURCE_LANGUAGE,
     DEFAULT_TARGET_LANGUAGE,
     DEFAULT_TEXT_DIRECTION,
+    DEFAULT_THEME,
     DEFAULT_TRANSLATION_PROVIDER,
     DISPLAY_MODES,
     OCR_ENGINES,
@@ -16,6 +18,7 @@ from scanwitme.domain.metadata import (
     SOURCE_LANGUAGES,
     TARGET_LANGUAGES,
     TRANSLATION_PROVIDERS,
+    get_app_themes,
     get_display_modes,
     get_language_to_ocr_mapping,
     get_ocr_engines,
@@ -24,6 +27,7 @@ from scanwitme.domain.metadata import (
     get_source_language_by_code,
     get_source_languages,
     get_target_languages,
+    get_theme_by_id,
     get_translation_providers,
     get_valid_display_modes,
     get_valid_ocr_engines,
@@ -31,6 +35,7 @@ from scanwitme.domain.metadata import (
     get_valid_reading_directions,
     get_valid_source_codes,
     get_valid_target_codes,
+    get_valid_theme_ids,
 )
 
 
@@ -42,6 +47,7 @@ def test_metadata_registries_non_empty() -> None:
     assert len(DISPLAY_MODES) >= 3
     assert len(READING_DIRECTIONS) >= 3
     assert len(OCR_ENGINES) >= 2
+    assert len(APP_THEMES) >= 3
 
 
 @pytest.mark.unit
@@ -52,6 +58,7 @@ def test_metadata_getter_functions() -> None:
     assert get_display_modes() == DISPLAY_MODES
     assert get_reading_directions() == READING_DIRECTIONS
     assert get_ocr_engines() == OCR_ENGINES
+    assert get_app_themes() == APP_THEMES
 
 
 @pytest.mark.unit
@@ -85,6 +92,12 @@ def test_metadata_validation_sets() -> None:
     assert "paddle" in valid_engines
     assert "manga_ocr" in valid_engines
 
+    valid_themes = get_valid_theme_ids()
+    assert "dark" in valid_themes
+    assert "light" in valid_themes
+    assert "amoled" in valid_themes
+    assert "system" in valid_themes
+
 
 @pytest.mark.unit
 def test_metadata_defaults_are_valid() -> None:
@@ -94,7 +107,19 @@ def test_metadata_defaults_are_valid() -> None:
     assert DEFAULT_DISPLAY_MODE in get_valid_display_modes()
     assert DEFAULT_TEXT_DIRECTION in get_valid_reading_directions()
     assert DEFAULT_OCR_ENGINE in get_valid_ocr_engines()
+    assert DEFAULT_THEME in get_valid_theme_ids()
     assert DEFAULT_HOTKEY == "<ctrl>+<shift>+s"
+
+
+@pytest.mark.unit
+def test_theme_metadata_helpers() -> None:
+    dark = get_theme_by_id("dark")
+    assert dark is not None
+    assert dark.get_name("id") == "Gelap"
+    assert dark.get_name("en") == "Dark"
+    assert "🌙" in dark.get_label("id")
+    assert "🌙" in dark.get_label("en")
+    assert get_theme_by_id("non_existent") is None
 
 
 @pytest.mark.unit

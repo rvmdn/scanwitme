@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from scanwitme.domain.models import CaptureResult, OCRBlock, Rect, TranslationResult
+from scanwitme.domain.models import CaptureResult, HistoryItem, OCRBlock, Rect, TranslationResult
 
 
 class CaptureProvider(ABC):
@@ -121,4 +121,38 @@ class SettingsRepository(ABC):
     @abstractmethod
     def load(self) -> dict[str, Any]:
         """Load all settings from storage."""
+        pass
+
+
+class HistoryRepository(ABC):
+    """Abstract interface for comic dialogue scan history."""
+
+    @abstractmethod
+    def add_item(self, item: HistoryItem) -> None:
+        """Add or update a history item."""
+        pass
+
+    @abstractmethod
+    def get_items(self, filter_type: str = "ALL", query: str = "") -> list[HistoryItem]:
+        """Retrieve history items with optional filter and search query."""
+        pass
+
+    @abstractmethod
+    def toggle_favorite(self, item_id: str) -> bool:
+        """Toggle favorite bookmark status, returning new state."""
+        pass
+
+    @abstractmethod
+    def delete_item(self, item_id: str) -> None:
+        """Delete a single history entry."""
+        pass
+
+    @abstractmethod
+    def clear_all(self) -> None:
+        """Purge all history entries."""
+        pass
+
+    @abstractmethod
+    def export_formatted(self, filter_type: str = "ALL") -> str:
+        """Export history entries to formatted plain text."""
         pass

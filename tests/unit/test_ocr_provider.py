@@ -117,13 +117,17 @@ def test_sort_vertical_reading_order_japanese_manga() -> None:
     from scanwitme.infrastructure.ocr.paddle_ocr import sort_vertical_reading_order
 
     # Right column (x: 100-120): Top "A", Bottom "B"
-    right_top = OCRBlock(text="RightTop", box=[[100, 10], [120, 10], [120, 40], [100, 40]], confidence=0.99)
+    right_top = OCRBlock(
+        text="RightTop", box=[[100, 10], [120, 10], [120, 40], [100, 40]], confidence=0.99
+    )
     right_bottom = OCRBlock(
         text="RightBottom", box=[[100, 50], [120, 50], [120, 80], [100, 80]], confidence=0.99
     )
 
     # Left column (x: 50-70): Top "C", Bottom "D"
-    left_top = OCRBlock(text="LeftTop", box=[[50, 10], [70, 10], [70, 40], [50, 40]], confidence=0.99)
+    left_top = OCRBlock(
+        text="LeftTop", box=[[50, 10], [70, 10], [70, 40], [50, 40]], confidence=0.99
+    )
     left_bottom = OCRBlock(
         text="LeftBottom", box=[[50, 50], [70, 50], [70, 80], [50, 80]], confidence=0.99
     )

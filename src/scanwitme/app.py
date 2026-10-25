@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import re
+import time
+import uuid
 
 from PySide6.QtCore import QObject, QPoint, QRect, QRunnable, QThreadPool
 from PySide6.QtGui import QGuiApplication
@@ -13,6 +15,8 @@ from scanwitme.application.cache_service import CacheService
 from scanwitme.application.controller import ScanController
 from scanwitme.application.workflow import TranslationWorkflow
 from scanwitme.domain.errors import CaptureError
+from scanwitme.domain.i18n import tr
+from scanwitme.domain.interfaces import HistoryRepository
 from scanwitme.domain.metadata import (
     DEFAULT_DISPLAY_MODE,
     DEFAULT_OCR_ENGINE,
@@ -20,10 +24,12 @@ from scanwitme.domain.metadata import (
     DEFAULT_TARGET_LANGUAGE,
     DEFAULT_TEXT_DIRECTION,
     DEFAULT_TRANSLATION_PROVIDER,
+    DEFAULT_UI_LANGUAGE,
 )
-from scanwitme.domain.models import OCRBlock, Rect, ScanState, TranslationResult
+from scanwitme.domain.models import HistoryItem, OCRBlock, Rect, ScanState, TranslationResult
 from scanwitme.infrastructure.cache.sqlite_cache import SQLiteCacheRepository
 from scanwitme.infrastructure.capture.qt_capture import QtScreenCaptureProvider
+from scanwitme.infrastructure.history.sqlite_history import SQLiteHistoryRepository
 from scanwitme.infrastructure.ocr.manga_ocr import MangaOCRProvider
 from scanwitme.infrastructure.ocr.paddle_ocr import PaddleOCRProvider, detect_script
 from scanwitme.infrastructure.settings.json_settings import JsonSettingsRepository
@@ -40,6 +46,7 @@ from scanwitme.presentation.bubble_overlay import (
     cluster_ocr_blocks,
 )
 from scanwitme.presentation.floating_overlay import FloatingOverlay
+from scanwitme.presentation.history_dialog import HistoryDialog
 from scanwitme.presentation.hotkey import GlobalHotkeyManager
 from scanwitme.presentation.live_watcher import LiveAutoScanWatcher
 from scanwitme.presentation.main_window import MainWindow
@@ -55,7 +62,11 @@ logger = logging.getLogger("scanwitme.app")
 class ScanWitMeApp(QObject):
     """Coordinates lifecycle, GUI windows, worker threads, and domain services."""
 
-    def __init__(self, q_app: QApplication) -> None:
+    def __init__(
+        self,
+        q_app: QApplication,
+        history_repo: HistoryRepository | None = None,
+    ) -> None:
         super().__init__()
         self._q_app = q_app
 
@@ -65,6 +76,11 @@ class ScanWitMeApp(QObject):
 
         self.cache_repo = SQLiteCacheRepository(db_path=self.app_settings.cache_db_path)
         self.cache_service = CacheService(repository=self.cache_repo)
+
+        if history_repo is not None:
+            self.history_repo: HistoryRepository = history_repo
+        else:
+            self.history_repo = SQLiteHistoryRepository(db_path=self.app_settings.history_db_path)
 
         self.capture_provider = QtScreenCaptureProvider(self._q_app)
         self.ocr_provider = PaddleOCRProvider()
@@ -103,16 +119,20 @@ class ScanWitMeApp(QObject):
         self.bubble_overlay = BubbleOverlayWindow()
         self.tray = TrayManager(self.main_window)
         self.settings_dialog: SettingsDialog | None = None
+        self.history_dialog: HistoryDialog | None = None
 
         # Live Auto-Scan Watcher
         self.live_watcher = LiveAutoScanWatcher()
         self.live_watcher.set_callbacks(
             get_rect_fn=self.sniper_frame.get_capture_rect,
-            is_busy_fn=lambda: self.controller.state not in (
-                ScanState.IDLE,
-                ScanState.COMPLETED,
-                ScanState.ERROR,
-                ScanState.CANCELLED,
+            is_busy_fn=lambda: (
+                self.controller.state
+                not in (
+                    ScanState.IDLE,
+                    ScanState.COMPLETED,
+                    ScanState.ERROR,
+                    ScanState.CANCELLED,
+                )
             ),
         )
 
@@ -150,12 +170,17 @@ class ScanWitMeApp(QObject):
         self.main_window.scan_requested.connect(self.trigger_scan)
         self.main_window.toggle_frame_requested.connect(self._toggle_sniper_frame)
         self.main_window.settings_requested.connect(self._open_settings)
+        self.main_window.history_requested.connect(self._open_history)
         self.main_window.display_mode_changed.connect(self._on_display_mode_changed)
         self.main_window.text_direction_changed.connect(self._on_text_direction_changed)
         self.main_window.source_language_changed.connect(self._on_source_lang_changed)
+        self.main_window.target_language_changed.connect(self._on_target_lang_changed)
+        self.main_window.ui_language_changed.connect(self._on_ui_lang_changed)
+        self.main_window.theme_changed.connect(self._on_theme_changed)
         self.main_window.provider_changed.connect(self._on_provider_changed)
         self.tray.scan_requested.connect(self.trigger_scan)
         self.tray.show_main_requested.connect(self._show_main_window)
+        self.tray.history_requested.connect(self._open_history)
         self.tray.settings_requested.connect(self._open_settings)
         self.tray.exit_requested.connect(self._exit_app)
         self.hotkey_manager.hotkey_triggered.connect(self.trigger_scan)
@@ -337,7 +362,7 @@ class ScanWitMeApp(QObject):
         configured_source_lang = self.settings_repo.get(
             "default_source_language", DEFAULT_SOURCE_LANGUAGE
         )
-        target_lang = DEFAULT_TARGET_LANGUAGE
+        target_lang = self.settings_repo.get("default_target_language", DEFAULT_TARGET_LANGUAGE)
 
         combined_text = " ".join(b.text.strip() for b in blocks if b.text.strip())
 
@@ -363,7 +388,7 @@ class ScanWitMeApp(QObject):
             self.controller.on_translation_completed(session_id, pseudo_result, 0.0)
             self.overlay.display_result(pseudo_result)
             self.main_window.set_status(
-                f"Google Translate ({source_lang.upper()} ➔ ID) dibuka di browser."
+                f"Google Translate ({source_lang.upper()} ➔ {target_lang.upper()}) dibuka di browser."
             )
             return
 
@@ -404,11 +429,7 @@ class ScanWitMeApp(QObject):
 
         display_mode = self.settings_repo.get("display_mode", DEFAULT_DISPLAY_MODE)
         session = self.controller.current_session
-        capture_rect = (
-            session.capture.bounds
-            if session and session.capture
-            else None
-        )
+        capture_rect = session.capture.bounds if session and session.capture else None
 
         # 1. Floating card display
         if display_mode in ("card", "both"):
@@ -427,6 +448,26 @@ class ScanWitMeApp(QObject):
                 self.bubble_overlay.clear_bubbles()
         else:
             self.bubble_overlay.clear_bubbles()
+
+        # Record dialogue to history repository
+        if (
+            result.source_text.strip()
+            and result.translated_text.strip()
+            and not result.translated_text.startswith("[Dibuka")
+        ):
+            try:
+                hist_item = HistoryItem(
+                    id=str(uuid.uuid4()),
+                    source_text=result.source_text.strip(),
+                    translated_text=result.translated_text.strip(),
+                    source_lang=result.source_language,
+                    target_lang=result.target_language,
+                    timestamp=time.time(),
+                    is_favorite=False,
+                )
+                self.history_repo.add_item(hist_item)
+            except Exception as exc:
+                logger.warning("Failed to record dialogue history: %s", exc)
 
         self.main_window.set_status("Terjemahan selesai.")
         if self.live_watcher.is_active:
@@ -448,9 +489,9 @@ class ScanWitMeApp(QObject):
 
         # Determine reading direction (Japanese manga dialogue reads Right-to-Left)
         text_dir = self.settings_repo.get("text_direction", DEFAULT_TEXT_DIRECTION)
-        is_vert = (
-            text_dir == "vertical"
-            or (text_dir == "auto" and any((b.max_y - b.min_y) > 1.2 * (b.max_x - b.min_x) for b in blocks))
+        is_vert = text_dir == "vertical" or (
+            text_dir == "auto"
+            and any((b.max_y - b.min_y) > 1.2 * (b.max_x - b.min_x) for b in blocks)
         )
 
         if is_vert:
@@ -552,8 +593,36 @@ class ScanWitMeApp(QObject):
         if display_mode in ("card", "both") and not self.live_watcher.is_active:
             self.overlay.set_error(error_message)
         self.main_window.set_status(f"Error: {error_message}")
-        if self.live_watcher.is_active:
-            self.live_watcher.reset_baseline()
+
+    def _on_display_mode_changed(self, mode: str) -> None:
+        logger.info("Display mode changed to: %s", mode)
+        self.main_window.set_status(f"Mode tampilan diubah ke: {mode}")
+
+    def _on_text_direction_changed(self, direction: str) -> None:
+        logger.info("Text direction changed to: %s", direction)
+        self.main_window.set_status(f"Arah bacaan diubah ke: {direction}")
+
+    def _on_source_lang_changed(self, lang: str) -> None:
+        logger.info("Source language changed to: %s", lang)
+        self.main_window.set_status(f"Bahasa asli diubah ke: {lang.upper()}")
+
+    def _on_target_lang_changed(self, lang: str) -> None:
+        logger.info("Target language changed to: %s", lang)
+        ui_l = self.settings_repo.get("default_ui_language", DEFAULT_UI_LANGUAGE)
+        self.main_window.set_status(tr("status_target_changed", ui_l, lang=lang.upper()))
+
+    def _on_ui_lang_changed(self, lang: str) -> None:
+        logger.info("UI language changed to: %s", lang)
+        self.main_window.set_status(tr("status_ui_changed", lang, lang=lang.upper()))
+
+    def _on_theme_changed(self, theme_id: str) -> None:
+        logger.info("Theme changed to: %s", theme_id)
+        ui_l = self.settings_repo.get("default_ui_language", DEFAULT_UI_LANGUAGE)
+        self.main_window.set_status(tr("status_theme_changed", ui_l, theme=theme_id.capitalize()))
+
+    def _on_provider_changed(self, provider: str) -> None:
+        logger.info("Provider changed to: %s", provider)
+        self.main_window.set_status(f"Provider diubah ke: {provider}")
 
     def _on_search_requested(self, query: str) -> None:
         GoogleSearchLauncher.launch(query)
@@ -584,6 +653,15 @@ class ScanWitMeApp(QObject):
         )
         self.settings_dialog.settings_saved.connect(self._on_settings_saved)
         self.settings_dialog.exec()
+
+    def _open_history(self) -> None:
+        ui_lang = self.settings_repo.get("default_ui_language", DEFAULT_UI_LANGUAGE)
+        self.history_dialog = HistoryDialog(
+            history_repo=self.history_repo,
+            ui_lang=ui_lang,
+            parent=self.main_window,
+        )
+        self.history_dialog.exec()
 
     def _on_settings_saved(self) -> None:
         self.app_settings = self.settings_repo.to_app_settings()

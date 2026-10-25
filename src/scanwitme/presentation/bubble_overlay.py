@@ -209,7 +209,11 @@ class BubbleOverlayWindow(QWidget):
                 badge_font = QFont("Segoe UI", 7, QFont.Weight.Bold)
                 painter.setFont(badge_font)
                 painter.setPen(QColor(180, 83, 9))
-                painter.drawText(r.adjusted(4, 2, -4, -2), int(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight), "ASLI")
+                painter.drawText(
+                    r.adjusted(4, 2, -4, -2),
+                    int(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight),
+                    "ASLI",
+                )
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pos = event.position().toPoint()

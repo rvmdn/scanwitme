@@ -18,12 +18,16 @@ from PySide6.QtWidgets import (
 
 from scanwitme.domain.interfaces import CacheRepository, SettingsRepository
 from scanwitme.domain.metadata import (
+    APP_THEMES,
+    APP_UI_LANGUAGES,
     DEFAULT_DISPLAY_MODE,
     DEFAULT_HOTKEY,
     DEFAULT_OCR_ENGINE,
     DEFAULT_SOURCE_LANGUAGE,
     DEFAULT_TEXT_DIRECTION,
+    DEFAULT_THEME,
     DEFAULT_TRANSLATION_PROVIDER,
+    DEFAULT_UI_LANGUAGE,
     DISPLAY_MODES,
     OCR_ENGINES,
     READING_DIRECTIONS,
@@ -70,39 +74,59 @@ class SettingsDialog(QDialog):
         api_key_layout.addWidget(self._toggle_key_btn)
         form.addRow("API Key:", api_key_layout)
 
+        ui_lang = self._settings_repo.get("default_ui_language", "id")
+
         # Source Language
         self._source_lang_combo = QComboBox(self)
         for opt in SOURCE_LANGUAGES:
-            self._source_lang_combo.addItem(opt.label, opt.code)
-        form.addRow("Bahasa Asli:", self._source_lang_combo)
+            self._source_lang_combo.addItem(opt.get_label(ui_lang), opt.code)
+        form.addRow(
+            "Bahasa Asli:" if ui_lang == "id" else "Source Language:", self._source_lang_combo
+        )
 
         # Target Language
-        self._target_lang_label = QLabel("Indonesia (id)", self)
-        form.addRow("Bahasa Target:", self._target_lang_label)
+        self._target_lang_label = QLabel(
+            "Indonesia (id)" if ui_lang == "id" else "Indonesian (id)", self
+        )
+        form.addRow(
+            "Bahasa Target:" if ui_lang == "id" else "Target Language:", self._target_lang_label
+        )
 
         # Provider
         self._provider_combo = QComboBox(self)
         for opt in TRANSLATION_PROVIDERS:
-            self._provider_combo.addItem(opt.label, opt.id)
+            self._provider_combo.addItem(opt.get_label(ui_lang), opt.id)
         form.addRow("Provider:", self._provider_combo)
 
         # Display Mode
         self._mode_combo = QComboBox(self)
         for opt in DISPLAY_MODES:
-            self._mode_combo.addItem(opt.label, opt.id)
-        form.addRow("Mode Tampilan:", self._mode_combo)
+            self._mode_combo.addItem(opt.get_label(ui_lang), opt.id)
+        form.addRow("Mode Tampilan:" if ui_lang == "id" else "Display Mode:", self._mode_combo)
 
         # Text Direction
         self._dir_combo = QComboBox(self)
         for opt in READING_DIRECTIONS:
-            self._dir_combo.addItem(opt.label, opt.id)
-        form.addRow("Arah Baca:", self._dir_combo)
+            self._dir_combo.addItem(opt.get_label(ui_lang), opt.id)
+        form.addRow("Arah Baca:" if ui_lang == "id" else "Reading Direction:", self._dir_combo)
 
         # OCR Engine
         self._engine_combo = QComboBox(self)
         for opt in OCR_ENGINES:
-            self._engine_combo.addItem(opt.label, opt.id)
-        form.addRow("Mesin OCR:", self._engine_combo)
+            self._engine_combo.addItem(opt.get_label(ui_lang), opt.id)
+        form.addRow("Mesin OCR:" if ui_lang == "id" else "OCR Engine:", self._engine_combo)
+
+        # UI Language
+        self._ui_lang_combo = QComboBox(self)
+        for opt in APP_UI_LANGUAGES:
+            self._ui_lang_combo.addItem(opt.label, opt.code)
+        form.addRow("Bahasa UI:" if ui_lang == "id" else "UI Language:", self._ui_lang_combo)
+
+        # Theme
+        self._theme_combo = QComboBox(self)
+        for opt in APP_THEMES:
+            self._theme_combo.addItem(opt.get_label(ui_lang), opt.id)
+        form.addRow("Tema:" if ui_lang == "id" else "Theme:", self._theme_combo)
 
         # Hotkey
         self._hotkey_edit = QLineEdit(self)
@@ -151,7 +175,9 @@ class SettingsDialog(QDialog):
         if idx >= 0:
             self._source_lang_combo.setCurrentIndex(idx)
 
-        provider = self._settings_repo.get("default_translation_provider", DEFAULT_TRANSLATION_PROVIDER)
+        provider = self._settings_repo.get(
+            "default_translation_provider", DEFAULT_TRANSLATION_PROVIDER
+        )
         idx_p = self._provider_combo.findData(provider)
         if idx_p >= 0:
             self._provider_combo.setCurrentIndex(idx_p)
@@ -171,6 +197,16 @@ class SettingsDialog(QDialog):
         if idx_e >= 0:
             self._engine_combo.setCurrentIndex(idx_e)
 
+        ui_lang = self._settings_repo.get("default_ui_language", DEFAULT_UI_LANGUAGE)
+        idx_u = self._ui_lang_combo.findData(ui_lang)
+        if idx_u >= 0:
+            self._ui_lang_combo.setCurrentIndex(idx_u)
+
+        theme = self._settings_repo.get("default_theme", DEFAULT_THEME)
+        idx_th = self._theme_combo.findData(theme)
+        if idx_th >= 0:
+            self._theme_combo.setCurrentIndex(idx_th)
+
         hotkey = self._settings_repo.get("hotkey", DEFAULT_HOTKEY)
         self._hotkey_edit.setText(hotkey)
 
@@ -188,6 +224,8 @@ class SettingsDialog(QDialog):
         mode = self._mode_combo.currentData()
         direction = self._dir_combo.currentData()
         engine = self._engine_combo.currentData()
+        ui_lang = self._ui_lang_combo.currentData()
+        theme = self._theme_combo.currentData()
         hotkey = self._hotkey_edit.text().strip() or "<ctrl>+<shift>+s"
 
         self._settings_repo.set("google_translate_api_key", api_key if api_key else None)
@@ -196,6 +234,8 @@ class SettingsDialog(QDialog):
         self._settings_repo.set("display_mode", mode)
         self._settings_repo.set("text_direction", direction)
         self._settings_repo.set("ocr_engine", engine)
+        self._settings_repo.set("default_ui_language", ui_lang)
+        self._settings_repo.set("default_theme", theme)
         self._settings_repo.set("hotkey", hotkey)
         self._settings_repo.save()
 

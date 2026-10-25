@@ -20,8 +20,18 @@ def test_cluster_ocr_blocks_empty() -> None:
 
 def test_cluster_ocr_blocks_single_and_close() -> None:
     # 2 vertically stacked lines of dialogue in the same speech bubble
-    b1 = OCRBlock(text="안녕하세요", box=[[10, 10], [80, 10], [80, 25], [10, 25]], confidence=0.99, reading_order=1)
-    b2 = OCRBlock(text="반갑습니다", box=[[12, 30], [82, 30], [82, 45], [12, 45]], confidence=0.98, reading_order=2)
+    b1 = OCRBlock(
+        text="안녕하세요",
+        box=[[10, 10], [80, 10], [80, 25], [10, 25]],
+        confidence=0.99,
+        reading_order=1,
+    )
+    b2 = OCRBlock(
+        text="반갑습니다",
+        box=[[12, 30], [82, 30], [82, 45], [12, 45]],
+        confidence=0.98,
+        reading_order=2,
+    )
 
     clusters = cluster_ocr_blocks([b1, b2], max_v_gap=24, max_h_gap=40)
     assert len(clusters) == 1
@@ -30,8 +40,18 @@ def test_cluster_ocr_blocks_single_and_close() -> None:
 
 def test_cluster_ocr_blocks_distant() -> None:
     # Two different bubbles located far apart on the page
-    b1 = OCRBlock(text="Bubble 1", box=[[10, 10], [60, 10], [60, 25], [10, 25]], confidence=0.95, reading_order=1)
-    b2 = OCRBlock(text="Bubble 2", box=[[200, 300], [250, 300], [250, 315], [200, 315]], confidence=0.95, reading_order=2)
+    b1 = OCRBlock(
+        text="Bubble 1",
+        box=[[10, 10], [60, 10], [60, 25], [10, 25]],
+        confidence=0.95,
+        reading_order=1,
+    )
+    b2 = OCRBlock(
+        text="Bubble 2",
+        box=[[200, 300], [250, 300], [250, 315], [200, 315]],
+        confidence=0.95,
+        reading_order=2,
+    )
 
     clusters = cluster_ocr_blocks([b1, b2], max_v_gap=24, max_h_gap=40)
     assert len(clusters) == 2
