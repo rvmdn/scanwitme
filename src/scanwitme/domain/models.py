@@ -126,3 +126,15 @@ class HistoryItem:
     target_lang: str
     timestamp: float
     is_favorite: bool = False
+
+
+@dataclass
+class GlossaryEntry:
+    """Custom comic term replacement entry."""
+
+    id: str
+    term: str
+    replacement: str
+    language: str = "ALL"  # "ALL", "JA", "KO", "ZH", "EN"
+    enabled: bool = True
+    case_sensitive: bool = False

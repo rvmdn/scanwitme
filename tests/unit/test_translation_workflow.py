@@ -71,3 +71,32 @@ def test_workflow_execution_and_caching() -> None:
     assert res2.translated_text == "Halo dunia"
     assert res2.cached is True
     assert mock_provider.translate.call_count == 1  # Provider NOT called again!
+
+
+@pytest.mark.unit
+def test_workflow_applies_glossary() -> None:
+    mock_provider = MagicMock()
+    mock_provider.provider_id = "free_direct"
+    mock_provider.translate.return_value = TranslationResult(
+        source_text="안녕하세요 선배",
+        translated_text="Halo senior",
+        source_language="ko",
+        target_language="id",
+        provider="free_direct",
+    )
+
+    mock_glossary = MagicMock()
+    mock_glossary.apply_glossary.return_value = "Halo Sunbae"
+
+    workflow = TranslationWorkflow(
+        translation_provider=mock_provider,
+        glossary_service=mock_glossary,
+    )
+
+    blocks = [
+        OCRBlock(text="안녕하세요 선배", box=[[0, 0], [10, 0], [10, 10], [0, 10]], confidence=0.9)
+    ]
+    res = workflow.execute(blocks, source_language="ko", target_language="id")
+
+    assert res.translated_text == "Halo Sunbae"
+    mock_glossary.apply_glossary.assert_called_once_with("Halo senior", language="ko")

@@ -5,7 +5,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from scanwitme.domain.models import CaptureResult, HistoryItem, OCRBlock, Rect, TranslationResult
+from scanwitme.domain.models import (
+    CaptureResult,
+    GlossaryEntry,
+    HistoryItem,
+    OCRBlock,
+    Rect,
+    TranslationResult,
+)
 
 
 class CaptureProvider(ABC):
@@ -155,4 +162,50 @@ class HistoryRepository(ABC):
     @abstractmethod
     def export_formatted(self, filter_type: str = "ALL") -> str:
         """Export history entries to formatted plain text."""
+        pass
+
+
+class GlossaryRepository(ABC):
+    """Abstract interface for comic term dictionary and glossary replacements."""
+
+    @abstractmethod
+    def add_entry(self, entry: GlossaryEntry) -> None:
+        """Add or update a glossary entry."""
+        pass
+
+    @abstractmethod
+    def update_entry(self, entry: GlossaryEntry) -> None:
+        """Update an existing glossary entry."""
+        pass
+
+    @abstractmethod
+    def delete_entry(self, entry_id: str) -> None:
+        """Delete a glossary entry by id."""
+        pass
+
+    @abstractmethod
+    def get_entries(
+        self, language: str = "ALL", enabled_only: bool = False, query: str = ""
+    ) -> list[GlossaryEntry]:
+        """Retrieve glossary entries with optional language, status, and search filters."""
+        pass
+
+    @abstractmethod
+    def toggle_enabled(self, entry_id: str) -> bool:
+        """Toggle active state of a glossary entry."""
+        pass
+
+    @abstractmethod
+    def apply_glossary(self, text: str, language: str = "ALL") -> str:
+        """Apply enabled glossary replacements to the given text."""
+        pass
+
+    @abstractmethod
+    def load_presets(self, overwrite: bool = False) -> int:
+        """Load built-in popular manga/manhwa/wuxia presets, returning count added."""
+        pass
+
+    @abstractmethod
+    def clear_all(self) -> None:
+        """Remove all glossary entries."""
         pass

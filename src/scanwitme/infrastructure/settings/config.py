@@ -58,6 +58,7 @@ class AppSettings:
     cache_enabled: bool = DEFAULT_CACHE_ENABLED
     cache_db_path: str = ""
     history_db_path: str = ""
+    glossary_db_path: str = ""
     log_level: str = DEFAULT_LOG_LEVEL
 
     def __post_init__(self) -> None:
@@ -70,6 +71,9 @@ class AppSettings:
 
         if not self.history_db_path:
             self.history_db_path = str(get_default_config_dir() / "scanwitme_history.db")
+
+        if not self.glossary_db_path:
+            self.glossary_db_path = str(get_default_config_dir() / "scanwitme_glossary.db")
 
         # Validate against parameterized metadata
         if self.default_source_language not in get_valid_source_codes():

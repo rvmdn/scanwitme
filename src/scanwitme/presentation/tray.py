@@ -40,6 +40,7 @@ class TrayManager(QObject):
 
     scan_requested = Signal()
     show_main_requested = Signal()
+    glossary_requested = Signal()
     history_requested = Signal()
     settings_requested = Signal()
     exit_requested = Signal()
@@ -65,6 +66,10 @@ class TrayManager(QObject):
         self._show_action = QAction("Buka ScanWitMe", menu)
         self._show_action.triggered.connect(self.show_main_requested.emit)
         menu.addAction(self._show_action)
+
+        self._glossary_action = QAction("📖 Kamus Istilah...", menu)
+        self._glossary_action.triggered.connect(self.glossary_requested.emit)
+        menu.addAction(self._glossary_action)
 
         self._history_action = QAction("📚 Riwayat Dialog...", menu)
         self._history_action.triggered.connect(self.history_requested.emit)

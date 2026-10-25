@@ -17,6 +17,7 @@ from scanwitme.domain.i18n import tr
 from scanwitme.domain.interfaces import (
     CacheRepository,
     CaptureProvider,
+    GlossaryRepository,
     HistoryRepository,
     OCRProvider,
     SettingsRepository,
@@ -69,6 +70,7 @@ from scanwitme.domain.metadata import (
 )
 from scanwitme.domain.models import (
     CaptureResult,
+    GlossaryEntry,
     HistoryItem,
     OCRBlock,
     Rect,
@@ -78,6 +80,8 @@ from scanwitme.domain.models import (
 )
 
 __all__ = [
+    "GlossaryEntry",
+    "GlossaryRepository",
     "APP_THEMES",
     "APP_UI_LANGUAGES",
     "DEFAULT_CACHE_ENABLED",

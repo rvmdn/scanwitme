@@ -16,7 +16,7 @@ from scanwitme.application.controller import ScanController
 from scanwitme.application.workflow import TranslationWorkflow
 from scanwitme.domain.errors import CaptureError
 from scanwitme.domain.i18n import tr
-from scanwitme.domain.interfaces import HistoryRepository
+from scanwitme.domain.interfaces import GlossaryRepository, HistoryRepository
 from scanwitme.domain.metadata import (
     DEFAULT_DISPLAY_MODE,
     DEFAULT_OCR_ENGINE,
@@ -29,6 +29,7 @@ from scanwitme.domain.metadata import (
 from scanwitme.domain.models import HistoryItem, OCRBlock, Rect, ScanState, TranslationResult
 from scanwitme.infrastructure.cache.sqlite_cache import SQLiteCacheRepository
 from scanwitme.infrastructure.capture.qt_capture import QtScreenCaptureProvider
+from scanwitme.infrastructure.glossary.sqlite_glossary import SQLiteGlossaryRepository
 from scanwitme.infrastructure.history.sqlite_history import SQLiteHistoryRepository
 from scanwitme.infrastructure.ocr.manga_ocr import MangaOCRProvider
 from scanwitme.infrastructure.ocr.paddle_ocr import PaddleOCRProvider, detect_script
@@ -46,6 +47,7 @@ from scanwitme.presentation.bubble_overlay import (
     cluster_ocr_blocks,
 )
 from scanwitme.presentation.floating_overlay import FloatingOverlay
+from scanwitme.presentation.glossary_dialog import GlossaryDialog
 from scanwitme.presentation.history_dialog import HistoryDialog
 from scanwitme.presentation.hotkey import GlobalHotkeyManager
 from scanwitme.presentation.live_watcher import LiveAutoScanWatcher
@@ -66,6 +68,7 @@ class ScanWitMeApp(QObject):
         self,
         q_app: QApplication,
         history_repo: HistoryRepository | None = None,
+        glossary_repo: GlossaryRepository | None = None,
     ) -> None:
         super().__init__()
         self._q_app = q_app
@@ -81,6 +84,15 @@ class ScanWitMeApp(QObject):
             self.history_repo: HistoryRepository = history_repo
         else:
             self.history_repo = SQLiteHistoryRepository(db_path=self.app_settings.history_db_path)
+
+        if glossary_repo is not None:
+            self.glossary_repo: GlossaryRepository = glossary_repo
+        else:
+            self.glossary_repo = SQLiteGlossaryRepository(
+                db_path=self.app_settings.glossary_db_path
+            )
+            if not self.glossary_repo.get_entries("ALL"):
+                self.glossary_repo.load_presets()
 
         self.capture_provider = QtScreenCaptureProvider(self._q_app)
         self.ocr_provider = PaddleOCRProvider()
@@ -99,6 +111,7 @@ class ScanWitMeApp(QObject):
         self.workflow = TranslationWorkflow(
             translation_provider=initial_provider,
             cache_service=self.cache_service if self.app_settings.cache_enabled else None,
+            glossary_service=self.glossary_repo,
         )
 
         # Application Controller
@@ -120,6 +133,7 @@ class ScanWitMeApp(QObject):
         self.tray = TrayManager(self.main_window)
         self.settings_dialog: SettingsDialog | None = None
         self.history_dialog: HistoryDialog | None = None
+        self.glossary_dialog: GlossaryDialog | None = None
 
         # Live Auto-Scan Watcher
         self.live_watcher = LiveAutoScanWatcher()
@@ -171,6 +185,7 @@ class ScanWitMeApp(QObject):
         self.main_window.toggle_frame_requested.connect(self._toggle_sniper_frame)
         self.main_window.settings_requested.connect(self._open_settings)
         self.main_window.history_requested.connect(self._open_history)
+        self.main_window.glossary_requested.connect(self._open_glossary)
         self.main_window.display_mode_changed.connect(self._on_display_mode_changed)
         self.main_window.text_direction_changed.connect(self._on_text_direction_changed)
         self.main_window.source_language_changed.connect(self._on_source_lang_changed)
@@ -180,6 +195,7 @@ class ScanWitMeApp(QObject):
         self.main_window.provider_changed.connect(self._on_provider_changed)
         self.tray.scan_requested.connect(self.trigger_scan)
         self.tray.show_main_requested.connect(self._show_main_window)
+        self.tray.glossary_requested.connect(self._open_glossary)
         self.tray.history_requested.connect(self._open_history)
         self.tray.settings_requested.connect(self._open_settings)
         self.tray.exit_requested.connect(self._exit_app)
@@ -662,6 +678,15 @@ class ScanWitMeApp(QObject):
             parent=self.main_window,
         )
         self.history_dialog.exec()
+
+    def _open_glossary(self) -> None:
+        ui_lang = self.settings_repo.get("default_ui_language", DEFAULT_UI_LANGUAGE)
+        self.glossary_dialog = GlossaryDialog(
+            glossary_repo=self.glossary_repo,
+            ui_lang=ui_lang,
+            parent=self.main_window,
+        )
+        self.glossary_dialog.exec()
 
     def _on_settings_saved(self) -> None:
         self.app_settings = self.settings_repo.to_app_settings()

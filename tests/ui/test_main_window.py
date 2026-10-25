@@ -26,6 +26,10 @@ def test_main_window_elements_and_signals(qtbot: QtBot, tmp_path: Path) -> None:
     with qtbot.waitSignal(window.scan_requested, timeout=1000):
         window._scan_btn.click()
 
+    # Test glossary button signal
+    with qtbot.waitSignal(window.glossary_requested, timeout=1000):
+        window._glossary_btn.click()
+
     # Test history button signal
     with qtbot.waitSignal(window.history_requested, timeout=1000):
         window._history_btn.click()

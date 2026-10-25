@@ -460,6 +460,8 @@ class HistoryDialog(QDialog):
             empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             empty_label.setStyleSheet("color: #64748b; font-size: 13px; padding: 40px;")
             self._cards_layout.addWidget(empty_label)
+            empty_label.show()
+            self._scroll_content.adjustSize()
             return
 
         for item in items:
@@ -467,6 +469,9 @@ class HistoryDialog(QDialog):
             card.favorite_toggled.connect(self._on_card_favorite_toggled)
             card.deleted.connect(self._on_card_deleted)
             self._cards_layout.addWidget(card)
+            card.show()
+
+        self._scroll_content.adjustSize()
 
     def _on_card_favorite_toggled(self, item_id: str, is_favorite: bool) -> None:
         self._repo.toggle_favorite(item_id)

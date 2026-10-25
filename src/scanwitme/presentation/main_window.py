@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
     auto_scan_toggled = Signal(bool)
     settings_requested = Signal()
     history_requested = Signal()
+    glossary_requested = Signal()
     source_language_changed = Signal(str)
     target_language_changed = Signal(str)
     ui_language_changed = Signal(str)
@@ -67,7 +68,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ScanWitMe PC — Screen Translator")
         self.setWindowIcon(create_default_tray_icon())
         self.setStyleSheet(MAIN_STYLESHEET)
-        self.setFixedSize(520, 485)
+        self.setFixedSize(540, 485)
 
         self._build_ui()
         self._load_settings()
@@ -88,6 +89,12 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(title_label)
         header_layout.addWidget(self._badge_label)
         header_layout.addStretch()
+
+        self._glossary_btn = QPushButton("📖 Kamus", central)
+        self._glossary_btn.setObjectName("secondaryButton")
+        self._glossary_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._glossary_btn.clicked.connect(self.glossary_requested.emit)
+        header_layout.addWidget(self._glossary_btn)
 
         self._history_btn = QPushButton("📚 Riwayat", central)
         self._history_btn.setObjectName("secondaryButton")
@@ -363,6 +370,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(tr("app_title", lang))
         if hasattr(self, "_badge_label"):
             self._badge_label.setText(tr("badge", lang))
+        if hasattr(self, "_glossary_btn"):
+            self._glossary_btn.setText(tr("btn_glossary", lang))
         if hasattr(self, "_history_btn"):
             self._history_btn.setText(tr("btn_history", lang))
         self._settings_btn.setText(tr("btn_settings", lang))
