@@ -16,7 +16,25 @@ from scanwitme.domain.interfaces import OCRProvider
 from scanwitme.domain.models import OCRBlock
 
 # Paddle static runner environment settings
+# Disable mkldnn/onednn on Windows CPU to prevent ConvertPirAttribute2RuntimeAttribute NotImplementedError
 os.environ["FLAGS_use_mkldnn"] = "0"
+try:
+    import paddle.inference as p_inf
+
+    if not hasattr(p_inf, "_scanwitme_patched"):
+        _orig_create_predictor = p_inf.create_predictor
+
+        def _patched_create_predictor(config):
+            if hasattr(config, "disable_mkldnn"):
+                config.disable_mkldnn()
+            if hasattr(config, "disable_onednn"):
+                config.disable_onednn()
+            return _orig_create_predictor(config)
+
+        p_inf.create_predictor = _patched_create_predictor
+        p_inf._scanwitme_patched = True
+except Exception:
+    pass
 
 
 from scanwitme.domain.metadata import get_language_to_ocr_mapping
@@ -163,7 +181,7 @@ def sort_horizontal_reading_order(blocks: list[OCRBlock]) -> list[OCRBlock]:
 class PaddleOCRProvider(OCRProvider):
     """Local OCR engine wrapping PaddleOCR with multi-language caching and spatial sorting."""
 
-    def __init__(self, use_textline_orientation: bool = True) -> None:
+    def __init__(self, use_textline_orientation: bool = False) -> None:
         self._use_textline_orientation = use_textline_orientation
         self._engines: dict[str, Any] = {}
         self._engine_lock = threading.Lock()
