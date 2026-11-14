@@ -1,0 +1,41 @@
+# Changelog — ScanWitMe PC
+
+Semua pembaruan penting pada proyek **ScanWitMe PC** didokumentasikan dalam berkas ini. Format penulisan mengacu pada [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan mengikuti standar [Semantic Versioning](https://semver.org/).
+
+---
+
+## [Unreleased] - v1.2.0
+
+### ✨ Ditambahkan
+- **Interactive Bubble Action Toolbar (Diadaptasi dari Mobile ScanWitMe.ai)**:
+  - Mini toolbar melayang yang otomatis muncul tepat di atas/bawah balon percakapan manga saat balon diklik.
+  - Tombol **`📋 Salin`** (*1-Click Copy*): Menyalin teks dialog (asli maupun terjemahan) langsung ke clipboard dengan indikator visual *✓ Disalin!*.
+  - Tombol **`🔍 Cari`** (*Google Search*): Membuka pencarian Google di browser default untuk mencari referensi istilah, nama karakter, atau lore komik.
+  - Tombol **`✖ Tutup`**: Menutup mini toolbar secara instan tanpa menutup overlay balon lainnya.
+  - Sinyal event baru `bubble_copied` dan `bubble_searched` untuk integrasi eksternal.
+
+---
+
+## [1.1.0] - 2026-10-25
+
+### ✨ Ditambahkan
+- **Kamus Istilah Komik & Glosarium Kustom (Custom Glossary)**:
+  - 40+ preset istilah populer untuk Manga (JA), Manhwa (KO), dan Manhua / Wuxia (ZH).
+  - Penggantian kata pintar berbasis regex word boundary dan pencocokan substring CJK.
+- **Riwayat Dialog Komik & Bookmark Favorit (SQLite WAL Mode)**:
+  - Penyimpanan lokal persisten untuk setiap teks yang dipindai.
+  - Filter tab bahasa, filter dialog favorit (⭐), pencarian instan, dan ekspor data ke JSON / TXT.
+- **Inno Setup Installer Script**:
+  - Script installer profesional `ScanWitMe-Installer.iss` dengan kompresi LZMA2 ultra (~154 MB) dan pembuatan shortcut otomatis.
+
+---
+
+## [1.0.0] - 2026-10-21
+
+### ✨ Rilis Perdana
+- Mode Live Auto-Scan dengan deteksi scroll komik (*Live Watcher*).
+- Balon percakapan inpainting langsung (*Direct Bubble Overlay*).
+- Deteksi orientasi vertikal Manga Jepang (*Tategaki*) dan sortir urutan baca Kanan ke Kiri (*RTL*).
+- OCR lokal berbasis PaddleOCR & Manga-OCR.
+- Sniper Frame Mode (jendela bidik transparan mengambang).
+- Integrasi Google Translate API & MyMemory Translation.

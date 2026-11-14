@@ -183,3 +183,143 @@ def test_bubble_overlay_escape_closes(qtbot: QtBot) -> None:
         overlay.keyPressEvent(event)
 
     assert not overlay.isVisible()
+
+
+def test_bubble_overlay_action_toolbar_copy(qtbot: QtBot, monkeypatch) -> None:
+    overlay = BubbleOverlayWindow()
+    qtbot.addWidget(overlay)
+
+    bubble = BubbleItem(
+        rect=QRect(20, 50, 100, 60),
+        original_text="Hello",
+        translated_text="Halo",
+    )
+    overlay.display_bubbles(Rect(0, 0, 400, 400), [bubble])
+
+    # First click bubble to show toolbar and select it
+    click_bubble = QPointF(30.0, 60.0)
+    ev_bubble = QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress,
+        click_bubble,
+        click_bubble,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    overlay.mousePressEvent(ev_bubble)
+    assert overlay._selected_bubble_index == 0
+
+    # Trigger repaint to generate hitboxes
+    overlay.repaint()
+
+    # Click copy button
+    copy_pt = QPointF(
+        float(overlay._action_copy_rect.center().x()),
+        float(overlay._action_copy_rect.center().y()),
+    )
+    ev_copy = QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress,
+        copy_pt,
+        copy_pt,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    with qtbot.waitSignal(overlay.bubble_copied, timeout=1000) as blocker:
+        overlay.mousePressEvent(ev_copy)
+
+    # current_text is "Hello" because first click toggled peek
+    assert blocker.args[0] == "Hello"
+    assert overlay._copied_feedback is True
+
+
+def test_bubble_overlay_action_toolbar_search(qtbot: QtBot, monkeypatch) -> None:
+    import webbrowser
+
+    searched_url = []
+    monkeypatch.setattr(webbrowser, "open", lambda url: searched_url.append(url))
+
+    overlay = BubbleOverlayWindow()
+    qtbot.addWidget(overlay)
+
+    bubble = BubbleItem(
+        rect=QRect(20, 50, 100, 60),
+        original_text="Dungeon",
+        translated_text="Penjara Bawah Tanah",
+    )
+    overlay.display_bubbles(Rect(0, 0, 400, 400), [bubble])
+
+    # Select bubble
+    click_bubble = QPointF(30.0, 60.0)
+    ev_bubble = QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress,
+        click_bubble,
+        click_bubble,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    overlay.mousePressEvent(ev_bubble)
+    overlay.repaint()
+
+    # Click search button
+    search_pt = QPointF(
+        float(overlay._action_search_rect.center().x()),
+        float(overlay._action_search_rect.center().y()),
+    )
+    ev_search = QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress,
+        search_pt,
+        search_pt,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    with qtbot.waitSignal(overlay.bubble_searched, timeout=1000):
+        overlay.mousePressEvent(ev_search)
+
+    assert len(searched_url) == 1
+    assert "https://www.google.com/search?q=" in searched_url[0]
+
+
+def test_bubble_overlay_action_toolbar_close(qtbot: QtBot) -> None:
+    overlay = BubbleOverlayWindow()
+    qtbot.addWidget(overlay)
+
+    bubble = BubbleItem(
+        rect=QRect(20, 50, 100, 60),
+        original_text="A",
+        translated_text="B",
+    )
+    overlay.display_bubbles(Rect(0, 0, 400, 400), [bubble])
+
+    # Select bubble
+    click_bubble = QPointF(30.0, 60.0)
+    ev_bubble = QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress,
+        click_bubble,
+        click_bubble,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    overlay.mousePressEvent(ev_bubble)
+    overlay.repaint()
+    assert overlay._selected_bubble_index == 0
+
+    # Click close button on toolbar
+    close_pt = QPointF(
+        float(overlay._action_close_rect.center().x()),
+        float(overlay._action_close_rect.center().y()),
+    )
+    ev_close = QMouseEvent(
+        QMouseEvent.Type.MouseButtonPress,
+        close_pt,
+        close_pt,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    overlay.mousePressEvent(ev_close)
+    assert overlay._selected_bubble_index == -1
+

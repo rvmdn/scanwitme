@@ -7,6 +7,8 @@ manga speech bubbles with authentic comic-book typography and speech bubble styl
 from __future__ import annotations
 
 import logging
+import urllib.parse
+import webbrowser
 from dataclasses import dataclass
 
 from PySide6.QtCore import QRect, Qt, Signal
@@ -14,6 +16,7 @@ from PySide6.QtGui import (
     QColor,
     QFont,
     QFontMetrics,
+    QGuiApplication,
     QKeyEvent,
     QMouseEvent,
     QPainter,
@@ -90,6 +93,8 @@ class BubbleOverlayWindow(QWidget):
 
     closed = Signal()
     bubble_clicked = Signal(int)  # Emits bubble index
+    bubble_copied = Signal(str)  # Emits copied text
+    bubble_searched = Signal(str)  # Emits searched query
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -104,11 +109,20 @@ class BubbleOverlayWindow(QWidget):
 
         self._bubbles: list[BubbleItem] = []
         self._capture_rect = Rect(0, 0, 100, 100)
+        self._selected_bubble_index: int = -1
+        self._copied_feedback: bool = False
+
+        self._action_toolbar_rect: QRect = QRect()
+        self._action_copy_rect: QRect = QRect()
+        self._action_search_rect: QRect = QRect()
+        self._action_close_rect: QRect = QRect()
 
     def display_bubbles(self, capture_rect: Rect, bubbles: list[BubbleItem]) -> None:
         """Position overlay over the captured comic region and render speech bubbles."""
         self._capture_rect = capture_rect
         self._bubbles = bubbles
+        self._selected_bubble_index = -1
+        self._copied_feedback = False
 
         self.setGeometry(
             capture_rect.x,
@@ -128,6 +142,8 @@ class BubbleOverlayWindow(QWidget):
     def clear_bubbles(self) -> None:
         """Clear all active bubble overlays and hide window."""
         self._bubbles.clear()
+        self._selected_bubble_index = -1
+        self._copied_feedback = False
         self.hide()
         self.update()
 
@@ -215,20 +231,109 @@ class BubbleOverlayWindow(QWidget):
                     "ASLI",
                 )
 
+        # 5. Draw Interactive Action Toolbar if a bubble is selected
+        if 0 <= self._selected_bubble_index < len(self._bubbles):
+            self._draw_action_toolbar(painter, self._bubbles[self._selected_bubble_index])
+
+    def _update_toolbar_rects(self, bubble: BubbleItem) -> None:
+        """Calculate layout coordinates for floating quick action toolbar."""
+        toolbar_w = 200
+        toolbar_h = 32
+        r = bubble.rect
+
+        if r.top() >= toolbar_h + 8:
+            tb_y = r.top() - toolbar_h - 4
+        else:
+            tb_y = min(self.height() - toolbar_h - 2, r.bottom() + 4)
+
+        tb_x = max(4, min(self.width() - toolbar_w - 4, r.center().x() - toolbar_w // 2))
+
+        self._action_toolbar_rect = QRect(tb_x, tb_y, toolbar_w, toolbar_h)
+        self._action_copy_rect = QRect(tb_x + 4, tb_y + 3, 76, toolbar_h - 6)
+        self._action_search_rect = QRect(tb_x + 84, tb_y + 3, 76, toolbar_h - 6)
+        self._action_close_rect = QRect(tb_x + 164, tb_y + 3, 32, toolbar_h - 6)
+
+    def _draw_action_toolbar(self, painter: QPainter, bubble: BubbleItem) -> None:
+        """Render floating quick action toolbar directly anchored to the selected bubble."""
+        self._update_toolbar_rects(bubble)
+        tb_x = self._action_toolbar_rect.x()
+        tb_y = self._action_toolbar_rect.y()
+        toolbar_h = self._action_toolbar_rect.height()
+
+        # Toolbar background & border
+        painter.setBrush(QColor(15, 23, 42, 245))
+        painter.setPen(QPen(QColor(99, 102, 241, 200), 1.5))
+        painter.drawRoundedRect(self._action_toolbar_rect, 8, 8)
+
+        # Dividers
+        painter.setPen(QPen(QColor(255, 255, 255, 40), 1))
+        painter.drawLine(tb_x + 82, tb_y + 6, tb_x + 82, tb_y + toolbar_h - 6)
+        painter.drawLine(tb_x + 162, tb_y + 6, tb_x + 162, tb_y + toolbar_h - 6)
+
+        # Typography
+        font = QFont("Segoe UI", 8, QFont.Weight.Bold)
+        painter.setFont(font)
+
+        copy_label = "✓ Disalin!" if self._copied_feedback else "📋 Salin"
+        copy_color = QColor(16, 185, 129) if self._copied_feedback else QColor(248, 250, 252)
+        painter.setPen(copy_color)
+        painter.drawText(self._action_copy_rect, int(Qt.AlignmentFlag.AlignCenter), copy_label)
+
+        painter.setPen(QColor(248, 250, 252))
+        painter.drawText(self._action_search_rect, int(Qt.AlignmentFlag.AlignCenter), "🔍 Cari")
+
+        painter.setPen(QColor(148, 163, 184))
+        painter.drawText(self._action_close_rect, int(Qt.AlignmentFlag.AlignCenter), "✖")
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         pos = event.position().toPoint()
 
         if event.button() == Qt.MouseButton.LeftButton:
-            # Check if clicked inside any bubble to toggle Peek Original
+            # 1. Check Action Toolbar buttons if toolbar is active
+            if 0 <= self._selected_bubble_index < len(self._bubbles):
+                active_bubble = self._bubbles[self._selected_bubble_index]
+
+                if self._action_copy_rect.contains(pos):
+                    clipboard = QGuiApplication.clipboard()
+                    if clipboard:
+                        clipboard.setText(active_bubble.current_text)
+                    self._copied_feedback = True
+                    self.update()
+                    self.bubble_copied.emit(active_bubble.current_text)
+                    event.accept()
+                    return
+
+                if self._action_search_rect.contains(pos):
+                    query = urllib.parse.quote(active_bubble.current_text)
+                    webbrowser.open(f"https://www.google.com/search?q={query}")
+                    self.bubble_searched.emit(active_bubble.current_text)
+                    event.accept()
+                    return
+
+                if self._action_close_rect.contains(pos):
+                    self._selected_bubble_index = -1
+                    self._copied_feedback = False
+                    self._action_toolbar_rect = QRect()
+                    self._action_copy_rect = QRect()
+                    self._action_search_rect = QRect()
+                    self._action_close_rect = QRect()
+                    self.update()
+                    event.accept()
+                    return
+
+            # 2. Check if clicked inside any bubble
             for idx, bubble in enumerate(self._bubbles):
                 if bubble.rect.contains(pos):
                     bubble.show_original = not bubble.show_original
+                    self._selected_bubble_index = idx
+                    self._copied_feedback = False
+                    self._update_toolbar_rects(bubble)
                     self.update()
                     self.bubble_clicked.emit(idx)
                     event.accept()
                     return
 
-            # Clicking outside bubbles closes the overlay
+            # 3. Clicking outside bubbles closes the overlay
             self.clear_bubbles()
             self.closed.emit()
             event.accept()
