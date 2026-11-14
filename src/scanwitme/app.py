@@ -157,6 +157,11 @@ class ScanWitMeApp(QObject):
 
         self._connect_signals()
 
+    @property
+    def q_app(self) -> QApplication:
+        """Return the underlying QApplication instance."""
+        return self._q_app
+
     def start(self) -> None:
         """Launch application UI, system tray, and hotkey listener."""
         self.main_window.show()
@@ -164,7 +169,11 @@ class ScanWitMeApp(QObject):
 
         # Show floating quick trigger on edge of primary screen
         if getattr(self.app_settings, "floating_trigger_enabled", True):
-            screen = self.q_app.primaryScreen()
+            screen = (
+                self._q_app.primaryScreen()
+                if hasattr(self, "_q_app") and self._q_app
+                else QGuiApplication.primaryScreen()
+            )
             if screen:
                 geom = screen.availableGeometry()
                 self.floating_trigger.move(geom.right() - 75, geom.center().y() - 27)

@@ -149,3 +149,28 @@ def test_free_direct_flow(qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.Monk
     assert app.overlay._source_label.text() == "渐的意识到自己"
     assert app.overlay._translated_label.text() == "Secara bertahap menyadari diri"
     assert "free_direct" in app.overlay._status_label.text()
+
+
+@pytest.mark.integration
+def test_app_start_lifecycle(
+    qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+
+    q_app = QApplication.instance() or QApplication([])
+    app = ScanWitMeApp(q_app=q_app)
+    qtbot.addWidget(app.main_window)
+    qtbot.addWidget(app.floating_trigger)
+
+    # Mock hotkey listener to prevent interference
+    app.hotkey_manager.start = MagicMock(return_value=True)
+
+    # Verify q_app property is accessible
+    assert app.q_app is q_app
+
+    # Test full start() method
+    app.start()
+
+    assert app.main_window.isVisible()
+    assert app.floating_trigger.isVisible()
+
