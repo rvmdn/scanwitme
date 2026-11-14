@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import webbrowser
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QComboBox,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -68,7 +70,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ScanWitMe PC — Screen Translator")
         self.setWindowIcon(create_default_tray_icon())
         self.setStyleSheet(MAIN_STYLESHEET)
-        self.setFixedSize(540, 485)
+        self.setFixedSize(540, 560)
 
         self._build_ui()
         self._load_settings()
@@ -78,7 +80,7 @@ class MainWindow(QMainWindow):
         central.setObjectName("centralWidget")
         layout = QVBoxLayout(central)
         layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(14)
+        layout.setSpacing(12)
 
         # Header bar
         header_layout = QHBoxLayout()
@@ -89,6 +91,14 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(title_label)
         header_layout.addWidget(self._badge_label)
         header_layout.addStretch()
+
+        self._theme_toggle_btn = QPushButton("🌙", central)
+        self._theme_toggle_btn.setObjectName("secondaryButton")
+        self._theme_toggle_btn.setToolTip("Ganti Tema Cepat (Dark / AMOLED / Light)")
+        self._theme_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._theme_toggle_btn.setFixedWidth(36)
+        self._theme_toggle_btn.clicked.connect(self._cycle_theme)
+        header_layout.addWidget(self._theme_toggle_btn)
 
         self._glossary_btn = QPushButton("📖 Kamus", central)
         self._glossary_btn.setObjectName("secondaryButton")
@@ -109,6 +119,42 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(self._settings_btn)
 
         layout.addLayout(header_layout)
+
+        # Hero Radar Card (Status Visualizer adapted from Android edition)
+        self._hero_card = QFrame(central)
+        self._hero_card.setObjectName("heroCard")
+        self._hero_card.setStyleSheet(
+            """
+            QFrame#heroCard {
+                background-color: #1e293b;
+                border: 1.5px solid #334155;
+                border-radius: 12px;
+            }
+            """
+        )
+        hero_layout = QHBoxLayout(self._hero_card)
+        hero_layout.setContentsMargins(14, 8, 14, 8)
+
+        self._radar_status_label = QLabel("⚡ RADAR SIAP • STANDBY", self._hero_card)
+        self._radar_status_label.setStyleSheet(
+            "color: #818cf8; font-weight: bold; font-size: 11px; letter-spacing: 0.5px;"
+        )
+        hero_layout.addWidget(self._radar_status_label)
+        hero_layout.addStretch()
+
+        self._config_badge_label = QLabel("AUTO ➔ ID • Manga RTL", self._hero_card)
+        self._config_badge_label.setStyleSheet(
+            """
+            background-color: #312e81;
+            color: #c7d2fe;
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            """
+        )
+        hero_layout.addWidget(self._config_badge_label)
+        layout.addWidget(self._hero_card)
 
         # Scan Buttons Row (Big Scan + Sniper Frame Mode + Live Auto)
         btn_row = QHBoxLayout()
@@ -137,6 +183,30 @@ class MainWindow(QMainWindow):
         btn_row.addWidget(self._auto_btn, stretch=1)
 
         layout.addLayout(btn_row)
+
+        # Quick Comic Readers Row (adapted from Mobile edition)
+        readers_row = QHBoxLayout()
+        readers_row.setSpacing(6)
+        readers_lbl = QLabel("Komik Web:", central)
+        readers_lbl.setStyleSheet("color: #64748b; font-size: 11px; font-weight: 600;")
+        readers_row.addWidget(readers_lbl)
+
+        for name, url in [
+            ("Webtoon", "https://www.webtoons.com/id/"),
+            ("MangaDex", "https://mangadex.org/"),
+            ("Asura", "https://asuracomic.net/"),
+        ]:
+            btn = QPushButton(name, central)
+            btn.setObjectName("secondaryButton")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet("font-size: 11px; padding: 3px 8px;")
+            btn.clicked.connect(
+                lambda checked=False, target_url=url, title=name: self._open_reader(title, target_url)
+            )
+            readers_row.addWidget(btn)
+
+        readers_row.addStretch()
+        layout.addLayout(readers_row)
 
         # Quick Settings Group
         group = QGroupBox("Konfigurasi Cepat", central)
@@ -293,6 +363,9 @@ class MainWindow(QMainWindow):
         if idx_th >= 0:
             self._theme_combo.setCurrentIndex(idx_th)
         self.apply_theme(theme)
+        if hasattr(self, "_theme_toggle_btn"):
+            self._theme_toggle_btn.setText("☀️" if theme == "light" else ("⚫" if theme == "amoled" else "🌙"))
+        self._update_config_badge()
 
         self.retranslate_ui()
 
@@ -305,6 +378,36 @@ class MainWindow(QMainWindow):
             .replace("+", "+")
         )
         self._hotkey_label.setText(f"Hotkey: {disp}")
+
+    def _open_reader(self, name: str, url: str) -> None:
+        """Launch popular comic reading URL in default web browser."""
+        webbrowser.open(url)
+        self.set_status(f"Membuka {name} di browser...")
+
+    def _cycle_theme(self) -> None:
+        """Quick 1-click theme rotator (Dark -> AMOLED -> Light)."""
+        current = self._theme_combo.currentData()
+        themes = ["dark", "amoled", "light"]
+        next_idx = (themes.index(current) + 1) % len(themes) if current in themes else 0
+        next_theme = themes[next_idx]
+
+        idx = self._theme_combo.findData(next_theme)
+        if idx >= 0:
+            self._theme_combo.setCurrentIndex(idx)
+
+    def _update_config_badge(self) -> None:
+        """Update live config pill inside the hero radar card."""
+        if not hasattr(self, "_config_badge_label"):
+            return
+        src = self._src_combo.currentData() or "AUTO"
+        tgt = self._tgt_combo.currentData() or "ID"
+        dir_code = self._dir_combo.currentData() or "auto"
+        dir_text = (
+            "Manga RTL"
+            if dir_code in ("vertical", "rtl")
+            else ("Webtoon LTR" if dir_code in ("horizontal", "ltr") else "Auto")
+        )
+        self._config_badge_label.setText(f"{src.upper()} ➔ {tgt.upper()} • {dir_text}")
 
     def update_from_settings(self) -> None:
         """Refresh UI state when settings change."""
@@ -319,6 +422,8 @@ class MainWindow(QMainWindow):
         self._settings_repo.set("default_theme", theme)
         self._settings_repo.save()
         self.apply_theme(theme)
+        if hasattr(self, "_theme_toggle_btn"):
+            self._theme_toggle_btn.setText("☀️" if theme == "light" else ("⚫" if theme == "amoled" else "🌙"))
         self.theme_changed.emit(theme)
 
     def set_auto_scan_active(self, active: bool) -> None:
@@ -332,9 +437,29 @@ class MainWindow(QMainWindow):
                 border: 1px solid #34d399;
             """)
             self._auto_btn.setText("🟢 Live: ON")
+            if hasattr(self, "_hero_card"):
+                self._hero_card.setStyleSheet("""
+                    QFrame#heroCard {
+                        background-color: #064e3b;
+                        border: 1.5px solid #10b981;
+                        border-radius: 12px;
+                    }
+                """)
+                self._radar_status_label.setText("🟢 RADAR AKTIF • MEMANTAU KOMIK")
+                self._radar_status_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 11px;")
         else:
             self._auto_btn.setStyleSheet("")
             self._auto_btn.setText("🔄 Live Auto")
+            if hasattr(self, "_hero_card"):
+                self._hero_card.setStyleSheet("""
+                    QFrame#heroCard {
+                        background-color: #1e293b;
+                        border: 1.5px solid #334155;
+                        border-radius: 12px;
+                    }
+                """)
+                self._radar_status_label.setText("⚡ RADAR SIAP • STANDBY")
+                self._radar_status_label.setStyleSheet("color: #818cf8; font-weight: bold; font-size: 11px; letter-spacing: 0.5px;")
 
     def _on_auto_clicked(self) -> None:
         new_state = not getattr(self, "_auto_active", False)
@@ -349,12 +474,14 @@ class MainWindow(QMainWindow):
         lang = self._src_combo.currentData()
         self._settings_repo.set("default_source_language", lang)
         self._settings_repo.save()
+        self._update_config_badge()
         self.source_language_changed.emit(lang)
 
     def _on_target_lang_changed(self) -> None:
         lang = self._tgt_combo.currentData()
         self._settings_repo.set("default_target_language", lang)
         self._settings_repo.save()
+        self._update_config_badge()
         self.target_language_changed.emit(lang)
 
     def _on_ui_lang_changed(self) -> None:
@@ -430,6 +557,7 @@ class MainWindow(QMainWindow):
         direction = self._dir_combo.currentData()
         self._settings_repo.set("text_direction", direction)
         self._settings_repo.save()
+        self._update_config_badge()
         self.text_direction_changed.emit(direction)
 
     def closeEvent(self, event: QCloseEvent) -> None:

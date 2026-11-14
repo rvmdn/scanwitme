@@ -7,6 +7,13 @@ Semua pembaruan penting pada proyek **ScanWitMe PC** didokumentasikan dalam berk
 ## [Unreleased] - v1.2.0
 
 ### ✨ Ditambahkan
+- **Header Quick Theme Switcher (1-Klik Ganti Tema)**:
+  - Tombol icon di header jendela utama untuk merotasi tema secara instan: **Dark (Slate)** ➔ **AMOLED (Pure Black)** ➔ **Light (Bersih)** dengan indikator ikon dinamis (`🌙` / `⚫` / `☀️`).
+- **Live Radar Status Hero Card (Diadaptasi dari Mobile ScanWitMe.ai)**:
+  - Kartu visual status pemindai di jendela utama dengan indikator denyut radar `⚡ RADAR SIAP • STANDBY` dan transisi otomatis ke `🟢 RADAR AKTIF • MEMANTAU KOMIK` berlatar emerald saat Live Auto-Scan aktif.
+  - Badge ringkasan konfigurasi aktif real-time (contoh: `JA ➔ ID • Manga RTL`).
+- **Quick Comic Readers Launcher**:
+  - Tombol akses 1-klik untuk membuka platform baca komik populer desktop (Webtoon, MangaDex, AsuraScan) langsung di web browser sekaligus menyiapkan pemindai.
 - **Persistent Floating AI Quick Trigger Widget (Diadaptasi dari Mobile ScanWitMe.ai)**:
   - Tombol melayang *StayOnTop* bergaya squircle dengan gradasi signature ScanWitMe (`#6366F1` ➔ `#8B5CF6`) dan ikon bintang AI Sparkle.
   - Dapat digeser (*draggable*) ke posisi mana pun di tepi layar.

@@ -71,6 +71,40 @@ def test_main_window_elements_and_signals(qtbot: QtBot, tmp_path: Path) -> None:
         window._dir_combo.setCurrentIndex(dir_idx)
     assert blocker.args == ["vertical"]
     assert repo.get("text_direction") == "vertical"
+    assert "Manga RTL" in window._config_badge_label.text()
+
+    # Test quick theme switcher button
+    current_theme = repo.get("default_theme")
+    with qtbot.waitSignal(window.theme_changed, timeout=1000) as blocker:
+        window._theme_toggle_btn.click()
+    assert blocker.args[0] != current_theme
+    assert repo.get("default_theme") == blocker.args[0]
+
+    # Test Live Radar visualizer update
+    window.set_auto_scan_active(True)
+    assert "RADAR AKTIF" in window._radar_status_label.text()
+    window.set_auto_scan_active(False)
+    assert "RADAR SIAP" in window._radar_status_label.text()
+
+
+@pytest.mark.ui
+def test_main_window_comic_reader_launchers(qtbot: QtBot, tmp_path: Path, monkeypatch) -> None:
+    import webbrowser
+
+    opened_urls = []
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened_urls.append(url))
+
+    settings_file = tmp_path / "settings.json"
+    repo = JsonSettingsRepository(file_path=settings_file)
+
+    window = MainWindow(settings_repo=repo)
+    qtbot.addWidget(window)
+
+    window._open_reader("Webtoon", "https://www.webtoons.com/id/")
+    assert len(opened_urls) == 1
+    assert "webtoons.com" in opened_urls[0]
+    assert "Membuka Webtoon" in window._status_label.text()
+
 
 
 @pytest.mark.ui
