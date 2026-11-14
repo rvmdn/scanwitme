@@ -162,8 +162,9 @@ def test_app_start_lifecycle(
     qtbot.addWidget(app.main_window)
     qtbot.addWidget(app.floating_trigger)
 
-    # Mock hotkey listener to prevent interference
+    # Mock hotkey listener and ocr preload to prevent interference
     app.hotkey_manager.start = MagicMock(return_value=True)
+    app.ocr_provider.preload = MagicMock()
 
     # Verify q_app property is accessible
     assert app.q_app is q_app

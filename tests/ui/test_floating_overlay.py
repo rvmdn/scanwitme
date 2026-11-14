@@ -91,3 +91,43 @@ def test_floating_overlay_buttons_and_dismiss(qtbot: QtBot) -> None:
     with qtbot.waitSignal(overlay.dismissed, timeout=1000):
         overlay._close_btn.click()
     assert not overlay.isVisible()
+
+
+@pytest.mark.ui
+def test_sliding_drawer_modes_and_dock_toggle(qtbot: QtBot) -> None:
+    overlay = FloatingOverlay(dock_mode="bottom")
+    qtbot.addWidget(overlay)
+
+    assert overlay.dock_mode == "bottom"
+    assert overlay._dock_btn.text() == "⇄ Sisi Kiri"
+
+    # Toggle to left
+    with qtbot.waitSignal(overlay.dock_mode_changed, timeout=1000) as blocker:
+        overlay._dock_btn.click()
+    assert blocker.args == ["left"]
+    assert overlay.dock_mode == "left"
+    assert overlay._dock_btn.text() == "⇄ Bawah"
+
+    # Toggle back to bottom
+    with qtbot.waitSignal(overlay.dock_mode_changed, timeout=1000) as blocker:
+        overlay._dock_btn.click()
+    assert blocker.args == ["bottom"]
+    assert overlay.dock_mode == "bottom"
+
+
+@pytest.mark.ui
+def test_sliding_drawer_loading_and_error_states(qtbot: QtBot) -> None:
+    overlay = FloatingOverlay()
+    qtbot.addWidget(overlay)
+
+    # Loading state
+    overlay.set_loading("Mengenali teks...")
+    assert overlay.isVisible()
+    assert overlay._status_label.text() == "Mengenali teks..."
+    assert overlay._source_label.text() == "Memproses gambar..."
+
+    # Error state
+    overlay.set_error("No readable text")
+    assert overlay.isVisible()
+    assert overlay._status_label.text() == "Gagal"
+    assert "No readable text" in overlay._translated_label.text()

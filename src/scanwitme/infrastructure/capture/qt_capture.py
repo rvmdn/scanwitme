@@ -58,10 +58,23 @@ class QtScreenCaptureProvider(CaptureProvider):
                 "Calculated capture region is completely outside visible screen bounds."
             )
 
+        if self._app:
+            self._app.processEvents()
+
         # Grab window pixels (0 = entire screen root)
-        # Note: grabWindow expects native device pixels or logical pixels depending on Qt version;
-        # in Qt 6 grabWindow takes device-independent pixels.
-        pixmap: QPixmap = screen.grabWindow(0, crop_x, crop_y, crop_w, crop_h)
+        # On Windows High-DPI (DPR > 1, e.g. 125%, 150%, 200%), passing crop coordinates directly to
+        # screen.grabWindow(0, crop_x, crop_y, crop_w, crop_h) can suffer from GDI scaling bugs.
+        # Grabbing full screen and cropping device pixels ensures 100% precision across multi-DPI.
+        full_pixmap: QPixmap = screen.grabWindow(0)
+        if full_pixmap.isNull():
+            pixmap: QPixmap = screen.grabWindow(0, crop_x, crop_y, crop_w, crop_h)
+        else:
+            phys_x = max(0, int(round(crop_x * dpr)))
+            phys_y = max(0, int(round(crop_y * dpr)))
+            phys_w = min(full_pixmap.width() - phys_x, max(1, int(round(crop_w * dpr))))
+            phys_h = min(full_pixmap.height() - phys_y, max(1, int(round(crop_h * dpr))))
+            pixmap = full_pixmap.copy(phys_x, phys_y, phys_w, phys_h)
+
         if pixmap.isNull():
             raise CaptureError("Screen grab produced a null pixmap.")
 

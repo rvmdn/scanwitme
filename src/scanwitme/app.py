@@ -237,6 +237,7 @@ class ScanWitMeApp(QObject):
         self.overlay.google_lens_requested.connect(self._on_google_lens_requested)
         self.overlay.retry_requested.connect(self._on_retry_requested)
         self.overlay.dismissed.connect(self._on_overlay_dismissed)
+        self.overlay.dock_mode_changed.connect(self._on_overlay_dock_mode_changed)
 
         # Floating quick trigger & Bubble toolbar actions
         self.floating_trigger.trigger_clicked.connect(self.trigger_scan)
@@ -316,6 +317,8 @@ class ScanWitMeApp(QObject):
         self.bubble_overlay.clear_bubbles()
         # Temporarily hide sniper frame border during screenshot
         self.sniper_frame.hide()
+        if hasattr(self, "_q_app") and self._q_app:
+            self._q_app.processEvents()
         try:
             self._execute_scan_rect(rect)
         finally:
@@ -342,7 +345,7 @@ class ScanWitMeApp(QObject):
             self.main_window.set_status(f"Gagal menangkap layar: {exc}")
             return
 
-        # 2. Position overlay conveniently near the selection within visible screen boundaries
+        # 2. Slide-in translation drawer from bottom or left
         display_mode = self.settings_repo.get("display_mode", DEFAULT_DISPLAY_MODE)
         if display_mode in ("card", "both"):
             center_x = rect.x + rect.width // 2
@@ -351,29 +354,9 @@ class ScanWitMeApp(QObject):
                 QGuiApplication.screenAt(QPoint(center_x, center_y))
                 or QGuiApplication.primaryScreen()
             )
-            card_w = max(380, self.overlay.width())
-            card_h = max(220, self.overlay.height())
-
-            if screen:
-                screen_geo = screen.availableGeometry()
-                # Vertical positioning: place below if fits, otherwise place above
-                if rect.bottom + 8 + card_h <= screen_geo.bottom():
-                    overlay_y = rect.bottom + 8
-                elif rect.y - card_h - 8 >= screen_geo.top():
-                    overlay_y = rect.y - card_h - 8
-                else:
-                    overlay_y = max(screen_geo.top() + 8, screen_geo.bottom() - card_h - 8)
-
-                # Horizontal positioning: align with left edge, but clamp within screen width
-                overlay_x = min(
-                    max(screen_geo.left() + 8, rect.x),
-                    screen_geo.right() - card_w - 8,
-                )
-            else:
-                overlay_x = rect.x
-                overlay_y = rect.bottom + 8
-
-            self.overlay.move(QPoint(overlay_x, overlay_y))
+            dock_mode = self.settings_repo.get("slide_dock_position", "bottom")
+            self.overlay.set_dock_mode(dock_mode)
+            self.overlay.slide_in(screen=screen)
             self.overlay.set_loading("Mengenali teks...")
         else:
             self.overlay.hide()
@@ -696,6 +679,12 @@ class ScanWitMeApp(QObject):
 
     def _on_overlay_dismissed(self) -> None:
         self.controller.on_cancelled()
+
+    def _on_overlay_dock_mode_changed(self, mode: str) -> None:
+        self.settings_repo.set("slide_dock_position", mode)
+        self.settings_repo.save()
+        label = "Bawah (Bottom Sheet)" if mode == "bottom" else "Sisi Kiri (Drawer)"
+        self.main_window.set_status(f"Posisi panel terjemahan: Slide dari {label}.")
 
     def _open_settings(self) -> None:
         self.settings_dialog = SettingsDialog(

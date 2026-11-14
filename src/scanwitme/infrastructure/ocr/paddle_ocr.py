@@ -5,34 +5,19 @@ from __future__ import annotations
 import io
 import logging
 import os
+import threading
 from typing import Any
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 from scanwitme.domain.errors import OCRError, OCRModelError, OCRNoTextFound
 from scanwitme.domain.interfaces import OCRProvider
 from scanwitme.domain.models import OCRBlock
 
-# Prevent Windows oneDNN NotImplementedError in Paddle static runner
+# Paddle static runner environment settings
 os.environ["FLAGS_use_mkldnn"] = "0"
-try:
-    import paddle.inference as p_inf
 
-    if not hasattr(p_inf, "_scanwitme_patched"):
-        _orig_create_predictor = p_inf.create_predictor
-
-        def _patched_create_predictor(config):
-            if hasattr(config, "disable_onednn"):
-                config.disable_onednn()
-            if hasattr(config, "disable_mkldnn"):
-                config.disable_mkldnn()
-            return _orig_create_predictor(config)
-
-        p_inf.create_predictor = _patched_create_predictor
-        p_inf._scanwitme_patched = True
-except Exception:
-    pass
 
 from scanwitme.domain.metadata import get_language_to_ocr_mapping
 
@@ -181,26 +166,28 @@ class PaddleOCRProvider(OCRProvider):
     def __init__(self, use_textline_orientation: bool = True) -> None:
         self._use_textline_orientation = use_textline_orientation
         self._engines: dict[str, Any] = {}
+        self._engine_lock = threading.Lock()
 
     def _get_engine(self, ocr_lang: str) -> Any:
         """Lazily initialize and cache PaddleOCR engine for the requested language."""
-        if ocr_lang not in self._engines:
-            try:
-                from paddleocr import PaddleOCR
+        with self._engine_lock:
+            if ocr_lang not in self._engines:
+                try:
+                    from paddleocr import PaddleOCR
 
-                logger.info("Initializing PaddleOCR engine for language '%s'...", ocr_lang)
-                engine = PaddleOCR(
-                    use_doc_orientation_classify=False,
-                    use_doc_unwarping=False,
-                    use_textline_orientation=self._use_textline_orientation,
-                    lang=ocr_lang,
-                )
-                self._engines[ocr_lang] = engine
-                logger.info("PaddleOCR engine for language '%s' ready.", ocr_lang)
-            except Exception as exc:
-                logger.exception("Failed to initialize PaddleOCR for language '%s'", ocr_lang)
-                raise OCRModelError(f"Failed to load OCR model for '{ocr_lang}': {exc}") from exc
-        return self._engines[ocr_lang]
+                    logger.info("Initializing PaddleOCR engine for language '%s'...", ocr_lang)
+                    engine = PaddleOCR(
+                        use_doc_orientation_classify=False,
+                        use_doc_unwarping=False,
+                        use_textline_orientation=self._use_textline_orientation,
+                        lang=ocr_lang,
+                    )
+                    self._engines[ocr_lang] = engine
+                    logger.info("PaddleOCR engine for language '%s' ready.", ocr_lang)
+                except Exception as exc:
+                    logger.exception("Failed to initialize PaddleOCR for language '%s'", ocr_lang)
+                    raise OCRModelError(f"Failed to load OCR model for '{ocr_lang}': {exc}") from exc
+            return self._engines[ocr_lang]
 
     def preload(self, language: str = "ch") -> None:
         """Preload OCR models in background to eliminate first-scan cold-start latency."""
@@ -363,6 +350,21 @@ class PaddleOCRProvider(OCRProvider):
             except Exception as exc:
                 logger.exception("OCR inference error")
                 raise OCRError(f"OCR inference failed: {exc}") from exc
+
+        if not raw_blocks:
+            # Enhanced fallback: boost contrast and sharpness for subtle or low-contrast text (e.g. video subtitles/donghua/manhwa)
+            try:
+                enhanced_pil = ImageEnhance.Contrast(pil_image).enhance(1.4)
+                enhanced_np = np.array(enhanced_pil)
+                retry_lang = "ch" if language in ("auto", "zh") else LANGUAGE_MAPPING.get(language, "ch")
+                engine_retry = self._get_engine(retry_lang)
+                res_retry = engine_retry.ocr(enhanced_np)
+                raw_blocks = self._parse_results(res_retry)
+                if not raw_blocks and language == "auto":
+                    engine_ja = self._get_engine("japan")
+                    raw_blocks = self._parse_results(engine_ja.ocr(enhanced_np))
+            except Exception as exc:
+                logger.debug("Contrast-enhanced OCR fallback failed: %s", exc)
 
         if not raw_blocks:
             raise OCRNoTextFound("No readable text recognized in image.")

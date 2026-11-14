@@ -4,6 +4,25 @@ Semua pembaruan penting pada proyek **ScanWitMe PC** didokumentasikan dalam berk
 
 ---
 
+## [1.2.1] - 2026-11-14
+
+### ✨ Ditambahkan & Diperbarui
+- **Sliding Translation Drawer / Bottom Sheet (Panel Terjemahan Meluncur)**:
+  - Menggantikan dialog floating terpisah yang kaku dengan panel terjemahan meluncur (*slide-in drawer*) modern:
+    - **Slide dari Bawah (Bottom Sheet)**: Panel meluncur dari tepi bawah layar, dilengkapi pill handle `―` ala mobile UI yang ergonomis tanpa menutupi pandangan baca komik.
+    - **Slide dari Sisi Kiri (Sidebar Drawer)**: Panel meluncur dari tepi kiri layar untuk pengalaman pembacaan desktop bergaya sidebar.
+    - **1-Klik Ganti Posisi (`⇄ Sisi Kiri` / `⇄ Bawah`)**: Tombol cepat di header drawer untuk beralih posisi slide seketika dan tersimpan di konfigurasi.
+    - Animasi transisi halus (*cubic easing curve*) saat muncul dan ditutup (`✕`).
+- **High-DPI Coordinate Normalization Fix pada Tangkapan Layar**:
+  - Memperbaiki pemotongan koordinat layar pada monitor dengan scaling High-DPI Windows (misal 125%, 150%, 200%) agar tidak meleset atau menangkap area hitam/kosong.
+  - Menjamin perataan sinkronisasi sebelum penangkapan layar sehingga border bingkai sniper dan overlay tidak ikut tertangkap.
+- **Peningkatan Robustness Engine OCR & Image Preprocessing Fallback**:
+  - Mengatasi kendala model PaddleOCR pada Windows dengan menghapus pembatasan static predictor yang dapat memicu `kernel not registered`.
+  - Menambahkan *auto contrast & sharpness enhancement fallback* pada gambar/adegan komik dan donghua dengan kontras rendah atau font bergaya sebelum melaporkan teks tidak ditemukan.
+  - Menambahkan *thread-safe lock* pada inisialisasi model OCR.
+
+---
+
 ## [1.2.0] - 2026-11-14
 
 ### ✨ Ditambahkan
