@@ -7,6 +7,12 @@ Semua pembaruan penting pada proyek **ScanWitMe PC** didokumentasikan dalam berk
 ## [Unreleased] - v1.2.0
 
 ### ✨ Ditambahkan
+- **Persistent Floating AI Quick Trigger Widget (Diadaptasi dari Mobile ScanWitMe.ai)**:
+  - Tombol melayang *StayOnTop* bergaya squircle dengan gradasi signature ScanWitMe (`#6366F1` ➔ `#8B5CF6`) dan ikon bintang AI Sparkle.
+  - Dapat digeser (*draggable*) ke posisi mana pun di tepi layar.
+  - *Klik Kiri*: Memicu pemindaian area layar seketika tanpa perlu membuka jendela utama atau menekan hotkey keyboard.
+  - *Klik Kanan*: Menu konteks cepat untuk Scan Area, Buka Sniper Frame, Toggle Live Auto-Scan, dan Buka Jendela Utama.
+  - Indikator cincin neon berputar saat proses OCR dan terjemahan sedang berlangsung.
 - **Interactive Bubble Action Toolbar (Diadaptasi dari Mobile ScanWitMe.ai)**:
   - Mini toolbar melayang yang otomatis muncul tepat di atas/bawah balon percakapan manga saat balon diklik.
   - Tombol **`📋 Salin`** (*1-Click Copy*): Menyalin teks dialog (asli maupun terjemahan) langsung ke clipboard dengan indikator visual *✓ Disalin!*.

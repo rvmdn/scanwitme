@@ -56,6 +56,7 @@ class AppSettings:
     ocr_engine: str = DEFAULT_OCR_ENGINE
     hotkey: str = DEFAULT_HOTKEY
     cache_enabled: bool = DEFAULT_CACHE_ENABLED
+    floating_trigger_enabled: bool = True
     cache_db_path: str = ""
     history_db_path: str = ""
     glossary_db_path: str = ""

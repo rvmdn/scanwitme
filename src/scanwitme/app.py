@@ -47,6 +47,7 @@ from scanwitme.presentation.bubble_overlay import (
     cluster_ocr_blocks,
 )
 from scanwitme.presentation.floating_overlay import FloatingOverlay
+from scanwitme.presentation.floating_trigger import FloatingTriggerWidget
 from scanwitme.presentation.glossary_dialog import GlossaryDialog
 from scanwitme.presentation.history_dialog import HistoryDialog
 from scanwitme.presentation.hotkey import GlobalHotkeyManager
@@ -128,6 +129,7 @@ class ScanWitMeApp(QObject):
         self.main_window = MainWindow(settings_repo=self.settings_repo)
         self.region_selector = RegionSelector()
         self.sniper_frame = SniperFrame()
+        self.floating_trigger = FloatingTriggerWidget()
         self.overlay = FloatingOverlay()
         self.bubble_overlay = BubbleOverlayWindow()
         self.tray = TrayManager(self.main_window)
@@ -159,6 +161,14 @@ class ScanWitMeApp(QObject):
         """Launch application UI, system tray, and hotkey listener."""
         self.main_window.show()
         self.tray.show()
+
+        # Show floating quick trigger on edge of primary screen
+        if getattr(self.app_settings, "floating_trigger_enabled", True):
+            screen = self.q_app.primaryScreen()
+            if screen:
+                geom = screen.availableGeometry()
+                self.floating_trigger.move(geom.right() - 75, geom.center().y() - 27)
+            self.floating_trigger.show()
 
         # Start global hotkey
         success = self.hotkey_manager.start()
@@ -219,6 +229,19 @@ class ScanWitMeApp(QObject):
         self.overlay.retry_requested.connect(self._on_retry_requested)
         self.overlay.dismissed.connect(self._on_overlay_dismissed)
 
+        # Floating quick trigger & Bubble toolbar actions
+        self.floating_trigger.trigger_clicked.connect(self.trigger_scan)
+        self.floating_trigger.scan_requested.connect(self.trigger_scan)
+        self.floating_trigger.sniper_requested.connect(self._toggle_sniper_frame)
+        self.floating_trigger.live_toggled.connect(self._toggle_auto_scan)
+        self.floating_trigger.show_main_requested.connect(self._show_main_window)
+        self.bubble_overlay.bubble_copied.connect(
+            lambda text: self.main_window.set_status("✓ Teks dialog berhasil disalin ke clipboard!")
+        )
+        self.bubble_overlay.bubble_searched.connect(
+            lambda query: self.main_window.set_status(f"🔍 Mencari di Google: {query[:30]}...")
+        )
+
     def _toggle_sniper_frame(self) -> None:
         """Toggle on-screen sniper frame visibility."""
         if self.sniper_frame.isVisible():
@@ -268,6 +291,7 @@ class ScanWitMeApp(QObject):
         self.main_window.set_status("Pilih area manga di layar...")
 
     def _on_region_cancelled(self) -> None:
+        self.floating_trigger.set_scanning(False)
         self.controller.on_cancelled()
         self.main_window.set_status("Pemindaian dibatalkan.")
 
@@ -296,6 +320,7 @@ class ScanWitMeApp(QObject):
         if not session:
             return
 
+        self.floating_trigger.set_scanning(True)
         self.bubble_overlay.clear_bubbles()
         self.main_window.set_status("Menangkap layar dan memproses OCR...")
 
@@ -485,6 +510,7 @@ class ScanWitMeApp(QObject):
             except Exception as exc:
                 logger.warning("Failed to record dialogue history: %s", exc)
 
+        self.floating_trigger.set_scanning(False)
         self.main_window.set_status("Terjemahan selesai.")
         if self.live_watcher.is_active:
             self.live_watcher.reset_baseline()
@@ -602,6 +628,7 @@ class ScanWitMeApp(QObject):
         logger.info("Translation provider set to: %s", provider)
 
     def _on_worker_error(self, session_id: str, error_message: str) -> None:
+        self.floating_trigger.set_scanning(False)
         if not self.controller.on_error(session_id, error_message):
             return
 
