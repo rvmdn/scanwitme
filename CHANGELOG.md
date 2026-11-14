@@ -4,7 +4,7 @@ Semua pembaruan penting pada proyek **ScanWitMe PC** didokumentasikan dalam berk
 
 ---
 
-## [Unreleased] - v1.2.0
+## [1.2.0] - 2026-11-14
 
 ### ✨ Ditambahkan
 - **Header Quick Theme Switcher (1-Klik Ganti Tema)**:
